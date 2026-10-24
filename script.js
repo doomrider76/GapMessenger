@@ -1,5 +1,5 @@
 /* =========================================================
-   گپ v10.35 — Part 1: State / Helpers / Render
+   گپ v1.0.0 — Multi-Account & Local Sync Edition
    ========================================================= */
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -8,7 +8,7 @@ const escRe = s => String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const rid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 const icon = (n, s = 20) => `<svg width="${s}" height="${s}"><use href="#i-${n}"/></svg>`;
 const KEY = 'pisfon_v3', BACKUP_KEY = 'pisfon_backup_auto', VERSION_KEY = 'pisfon_version';
-const APP_VERSION = '10.35';
+const APP_VERSION = '1.0.0';
 
 /* ---------- viewport ---------- */
 const setVP = () => {
@@ -30,15 +30,11 @@ document.addEventListener('contextmenu', e => {
 
 /* ---------- constants ---------- */
 const CHANGELOG = [
-  'دیزاین جدید هدر گپ و چت',
-  'آواتارها مربع با لبه‌های گرد',
-  'دسته‌بندی دایره‌ای مستقل',
-  'پس‌زمینه #131313',
-  'Composer جدید: ویس + دکمه‌های کوچیک',
-  'تیک آبی از blue-tick.png',
-  'اسم کانال بزرگ‌تر + تیک وسط‌چین',
-  'رنگ اسم کانال رندوم ثابت',
-  'دکمه ارسال متن در composer'
+  'اضافه شدن سیستم مدیریتی',
+  'تغییر اسم برنامه به گپ',
+  'اضافه شدن سیستم نظرسنجی',
+  'تغییر ظاهری کل برنامه',
+  'افزایش سرعت برنامه'
 ];
 const AV_GRADS = [
   ['#ff6b6b','#c92a2a'],['#51cf66','#2b8a3e'],['#ffd43b','#e67700'],['#4dabf7','#1864ab'],
@@ -80,12 +76,33 @@ const EMOJIS = {
 };
 
 /* ---------- state ---------- */
-const emptyState = () => ({
-  me:{name:'من',phone:'',avatar:{type:'gradient',value:3},verified:false,username:''},
-  theme:'dark',
-  settings:{autoReply:true,enterToSend:true,sounds:false,aiMode:true,notifications:true,autoBackup:true},
-  chats:[], directory:[], contacts:[], lastBackupAt:0
+const emptyAccount = () => ({
+  id: 'acc_' + Date.now() + Math.random().toString(36).slice(2, 6),
+  name: 'من',
+  username: '',
+  phone: '',
+  avatar: { type: 'gradient', value: 3 },
+  verified: false,
+  chats: [],
+  contacts: []
 });
+
+const emptyState = () => ({
+  me: emptyAccount(),
+  accounts: [],
+  _globalDirectory: [],
+  bannedUsers: [],
+  theme: 'dark',
+  settings: { autoReply: true, enterToSend: true, sounds: false, aiMode: true, notifications: true, autoBackup: true },
+  lastBackupAt: 0
+});
+
+function normalizeAccount(acc) {
+  if (!acc.id) acc.id = 'acc_' + Date.now() + Math.random().toString(36).slice(2, 6);
+  if (!Array.isArray(acc.chats)) acc.chats = [];
+  if (!Array.isArray(acc.contacts)) acc.contacts = [];
+  return acc;
+}
 
 function normalizeChat(c, i) {
   if (!c.avatar) c.avatar = {type:'gradient',value:i % AV_GRADS.length};
@@ -119,35 +136,48 @@ function load() {
     const raw = localStorage.getItem(KEY);
     if (!raw) return null;
     const s = JSON.parse(raw);
-    if (!s || !Array.isArray(s.chats)) return null;
-    if (!s.me || typeof s.me !== 'object') s.me = emptyState().me;
-    if (!s.me.avatar) s.me.avatar = {type:'gradient',value:3};
-    if (typeof s.me.verified !== 'boolean') s.me.verified = false;
-    if (typeof s.me.phone !== 'string') s.me.phone = '';
-    if (typeof s.me.username !== 'string') s.me.username = '';
-    if (typeof s.me.name !== 'string' || !s.me.name) s.me.name = 'من';
+    if (!s || !Array.isArray(s.chats) && !s.me) return null; 
+
+    if (!s.me) s.me = emptyAccount();
+    if (!s.accounts) s.accounts = [];
+    
+    if (!s.me.chats && Array.isArray(s.chats)) s.me.chats = s.chats;
+    if (!s.me.contacts && Array.isArray(s.contacts)) s.me.contacts = s.contacts;
+    if (!s._globalDirectory && Array.isArray(s.directory)) s._globalDirectory = s.directory;
+    
+    delete s.chats; delete s.contacts; delete s.directory;
+
+    s.me = normalizeAccount(s.me);
+    s.accounts = s.accounts.map(normalizeAccount);
+    if (!Array.isArray(s._globalDirectory)) s._globalDirectory = [];
+    if (!Array.isArray(s.bannedUsers)) s.bannedUsers = [];
     s.settings = Object.assign(emptyState().settings, s.settings || {});
-    if (!Array.isArray(s.contacts)) s.contacts = [];
-    if (!Array.isArray(s.directory)) s.directory = [];
     if (s.theme !== 'light' && s.theme !== 'dark') s.theme = 'dark';
     if (typeof s.lastBackupAt !== 'number') s.lastBackupAt = 0;
-    s.chats = s.chats.map(normalizeChat);
-    s.directory = s.directory.map(normalizeChat);
-    s.contacts.forEach((c, i) => {
-      if (!c.avatar) c.avatar = {type:'gradient',value:i % AV_GRADS.length};
-      if (typeof c.verified !== 'boolean') c.verified = false;
-    });
-    const saved = s.chats.filter(c => c.type === 'saved');
-    if (saved.length > 1) {
-      const keep = saved[0];
-      for (let i = 1; i < saved.length; i++) keep.messages.push(...(saved[i].messages || []));
-      s.chats = s.chats.filter(c => c.type !== 'saved' || c === keep);
-    }
+
+    s.me.chats = s.me.chats.map(normalizeChat);
+    s.accounts.forEach(acc => acc.chats = acc.chats.map(normalizeChat));
+    s._globalDirectory = s._globalDirectory.map(normalizeChat);
+
     return s;
   } catch { return null; }
 }
 
-let state;
+let state = load() || emptyState();
+
+Object.defineProperty(state, 'chats', {
+  get() { return this.me.chats || (this.me.chats = []); },
+  set(v) { this.me.chats = v; }
+});
+Object.defineProperty(state, 'contacts', {
+  get() { return this.me.contacts || (this.me.contacts = []); },
+  set(v) { this.me.contacts = v; }
+});
+Object.defineProperty(state, 'directory', {
+  get() { return this._globalDirectory || (this._globalDirectory = []); },
+  set(v) { this._globalDirectory = v; }
+});
+
 let saveTimer;
 function save() {
   clearTimeout(saveTimer);
@@ -159,8 +189,6 @@ function save() {
     } catch {}
   }, 150);
 }
-
-state = load() || emptyState();
 
 function applyTheme() {
   document.documentElement.setAttribute('data-theme', state.theme || 'dark');
@@ -218,8 +246,8 @@ function avatarContent(e) {
   if (av.type === 'image') return '';
   return esc(initials(e.name));
 }
-const vfHTML = (s = 17) => `<img class="vf" src="blue-tick.png" width="${s}" height="${s}" alt="✓" loading="lazy">`;
-const nameWithVf = (n, v, s = 17) => `${esc(n)}${v ? vfHTML(s) : ''}`;
+const vfHTML = (s = 20) => `<img class="vf" src="blue-tick.png" width="${s}" height="${s}" alt="✓" loading="lazy">`;
+const nameWithVf = (n, v, s = 20) => `${esc(n)}${v ? vfHTML(s) : ''}`;
 
 function renderTopProfile() {
   const el = $('#top-profile-avatar');
@@ -268,13 +296,13 @@ const fmtBytes = b => b < 1024 ? b+' B' : b < 1048576 ? (b/1024).toFixed(1)+' KB
 const fmtNum = n => n < 1000 ? n.toLocaleString('fa-IR') : n < 1e6 ? (n/1000).toFixed(n<1e4?1:0)+'K' : (n/1e6).toFixed(1)+'M';
 
 let toastTimer;
-function toast(t) {
+function toast(t, type = 'info') {
   const el = $('#toast');
   if (!el) return;
+  el.className = `show ${type}`;
   el.textContent = t;
-  el.classList.add('show');
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => el.classList.remove('show'), 1800);
+  toastTimer = setTimeout(() => el.className = '', 2500);
 }
 
 const getChat = id => state.chats.find(c => c.id === id);
@@ -306,6 +334,7 @@ function previewText(c) {
   else if (m.type === 'voice') t = '🎤 پیام صوتی';
   else if (m.type === 'photo') t = '🖼 عکس';
   else if (m.type === 'file') t = '📎 فایل';
+  else if (m.type === 'poll') t = '📊 نظرسنجی';
   else if (m.type === 'location') t = '📍 موقعیت';
   else t = m.text;
   if (c.type === 'group' && !m.out && m.sender) t = m.sender + ': ' + t;
@@ -320,6 +349,7 @@ function userTaken(u, exKind = null, exId = null) {
   const low = normUser(u);
   if (!low) return false;
   if (exKind !== 'me' && state.me?.username && normUser(state.me.username) === low) return true;
+  if (state.accounts?.some(a => normUser(a.username) === low)) return true;
   if (state.chats.some(c => c.id !== exId && c.username && normUser(c.username) === low)) return true;
   if ((state.directory||[]).some(d => d.username && normUser(d.username) === low)) return true;
   return false;
@@ -327,10 +357,23 @@ function userTaken(u, exKind = null, exId = null) {
 function findByUsername(u) {
   const low = normUser(u);
   if (!low) return null;
-  const inChats = state.chats.find(c => c.username && normUser(c.username) === low);
-  if (inChats) return {entity:inChats, source:'chat'};
+  
   const inDir = (state.directory||[]).find(d => d.username && normUser(d.username) === low);
   if (inDir) return {entity:inDir, source:'directory'};
+  
+  const inChats = state.chats.find(c => c.username && normUser(c.username) === low);
+  if (inChats) return {entity:inChats, source:'chat'};
+  
+  const inAcc = state.accounts.find(a => a.username && normUser(a.username) === low);
+  if (inAcc) {
+    return { 
+      entity: { 
+        name: inAcc.name, username: inAcc.username, avatar: inAcc.avatar, 
+        verified: inAcc.verified, type: 'private', members: 0 
+      }, 
+      source: 'local_account' 
+    };
+  }
   return null;
 }
 
@@ -388,6 +431,30 @@ async function fetchAI(userMsg, history = [], sys = null) {
   } catch { return null; }
 }
 
+/* ---------- Local Sync ---------- */
+function syncMessageToTargetAccount(targetUsername, messageData, senderInfo) {
+  if (!targetUsername) return;
+  const targetAcc = state.accounts.find(a => normUser(a.username) === normUser(targetUsername));
+  if (!targetAcc) return;
+
+  if (!targetAcc.chats) targetAcc.chats = [];
+
+  let targetChat = targetAcc.chats.find(c => (c.username && normUser(c.username) === normUser(senderInfo.username)) || c.name === senderInfo.name);
+  if (!targetChat) {
+    targetChat = {
+      id: rid(), name: senderInfo.name, username: senderInfo.username,
+      type: 'private', avatar: senderInfo.avatar, verified: senderInfo.verified,
+      unread: 1, pinned: false, muted: false, draft: '', messages: [], createdAt: Date.now(), joined: true
+    };
+    targetAcc.chats.push(targetChat);
+  } else {
+    targetChat.unread = (targetChat.unread || 0) + 1;
+  }
+
+  targetChat.messages.push(Object.assign({}, messageData, { out: false, status: 'read' }));
+  save();
+}
+
 /* ---------- render: chat list ---------- */
 let chatFilter = 'all';
 let searchDebounce;
@@ -410,7 +477,7 @@ function renderChatList() {
       <div class="chat-item" data-directory="${d.id}">
         ${avatarHTML(d)}
         <div class="ci-body">
-          <div class="ci-top"><span class="ci-name">${nameWithVf(d.name, d.verified, 17)}</span>
+          <div class="ci-top"><span class="ci-name">${nameWithVf(d.name, d.verified, 20)}</span>
           <span class="ci-time" style="font-size:11px">${d.type === 'channel' ? 'کانال' : 'گروه'}</span></div>
           <div class="ci-bot"><span class="ci-prev">${esc(d.description || (d.members ? d.members.toLocaleString('fa-IR')+' عضو' : ''))}</span></div>
         </div>
@@ -465,7 +532,7 @@ function renderChatList() {
       return `<div class="chat-item" data-id="${c.id}">
         ${avatarHTML(c)}
         <div class="ci-body">
-          <div class="ci-top"><span class="ci-name">${nameWithVf(c.name, c.verified, 17)}</span>
+          <div class="ci-top"><span class="ci-name">${nameWithVf(c.name, c.verified, 20)}</span>
           <span class="ci-time">${m?ticks:''}${m?fmtListTime(lastTs(c)):''}</span></div>
           <div class="ci-bot"><span class="ci-prev">${esc(previewText(c))}</span>${pin}${badge}</div>
         </div>
@@ -485,7 +552,7 @@ function renderContacts() {
   box.innerHTML = state.contacts.map(c => `
     <div class="chat-item" data-contact="${c.id}">
       ${avatarHTML(c)}
-      <div class="ci-body"><div class="ci-top"><span class="ci-name">${nameWithVf(c.name, c.verified, 17)}</span></div>
+      <div class="ci-body"><div class="ci-top"><span class="ci-name">${nameWithVf(c.name, c.verified, 20)}</span></div>
       <div class="ci-bot"><span class="ci-prev">برای شروع گفتگو لمس کن</span></div></div>
     </div>`).join('');
 }
@@ -503,7 +570,7 @@ function renderSettings() {
       <button class="pc-edit-btn" id="btn-edit-profile">${icon('edit',14)} ویرایش</button>
       <div class="avatar big" id="my-avatar-btn" style="${avatarBgStyle(me)}">${avatarContent(me)}</div>
       <div style="text-align:center">
-        <div class="pn">${nameWithVf(me.name, me.verified, 22)}</div>
+        <div class="pn">${nameWithVf(me.name, me.verified, 26)}</div>
         <div class="pp" dir="ltr" style="text-align:center">${me.phone ? esc(me.phone) : 'شماره ثبت نشده'}</div>
         ${me.username ? `<div class="info-username" style="margin-top:8px">@${esc(me.username)}</div>` : ''}
       </div>
@@ -515,6 +582,15 @@ function renderSettings() {
       <div class="row" data-act="edit-phone"><span class="r-icon">${icon('phone',20)}</span><span class="r-text">شماره تلفن</span><span class="r-val" dir="ltr">${me.phone ? esc(me.phone) : '—'}</span><span class="chev">${icon('chevron',18)}</span></div>
       <div class="row"><span class="r-icon" style="background:#6c6c6e">${icon('verified',20)}</span><span class="r-text">تیک آبی</span><label class="switch"><input type="checkbox" data-me="verified" ${me.verified?'checked':''}><span class="sl"></span></label></div>
     </div>
+    
+    <!-- بخش مدیریت اکانت‌ها -->
+    <div class="section-title">مدیریت اکانت‌ها</div>
+    <div class="group" style="padding: 14px;">
+       <div id="accounts-list-container"></div>
+       <button class="btn-primary" style="width:100%; padding:12px; border-radius:12px; margin-top:8px; background:#6c6c6e; color:#fff; font-weight:700;" onclick="openAddAccountModal()">+ افزودن اکانت جدید</button>
+    </div>
+    <!-- پایان بخش مدیریت اکانت‌ها -->
+
     <div class="section-title">ظاهر</div>
     <div class="group">
       <div class="row" data-act="toggle-theme"><span class="r-icon">${icon(themeIcon,20)}</span><span class="r-text">تم ${themeLabel}</span><span class="chev">${icon('chevron',18)}</span></div>
@@ -540,7 +616,128 @@ function renderSettings() {
     </div>
     <div class="empty" style="padding:20px 40px 40px;font-size:12px;opacity:.55">گپ نسخه ${APP_VERSION} — حجم: ${(JSON.stringify(state).length/1024).toFixed(1)}KB</div>
   `;
+  renderAccountsList();
   renderTopProfile();
+}
+
+/* ---------- MULTI-ACCOUNT & MODERATION ---------- */
+function renderAccountsList() {
+  const box = $('#accounts-list-container');
+  if (!box) return;
+  
+  let html = `
+    <div class="account-card active">
+      <div class="account-info-wrap">
+        ${avatarHTML(state.me, 40).replace('class="avatar', 'class="account-avatar-sm avatar')}
+        <div>
+          <div class="account-name-sm">${esc(state.me.name)} ${state.me.verified ? vfHTML(16) : ''}</div>
+          <div class="account-handle-sm">${state.me.username ? '@'+state.me.username : 'بدون آیدی'}</div>
+        </div>
+      </div>
+      <span class="btn-active-label">فعال</span>
+    </div>
+  `;
+
+  state.accounts.forEach(acc => {
+    html += `
+      <div class="account-card">
+        <div class="account-info-wrap">
+          ${avatarHTML(acc, 40).replace('class="avatar', 'class="account-avatar-sm avatar')}
+          <div>
+            <div class="account-name-sm">${esc(acc.name)} ${acc.verified ? vfHTML(16) : ''}</div>
+            <div class="account-handle-sm">${acc.username ? '@'+acc.username : 'بدون آیدی'}</div>
+          </div>
+        </div>
+        <button class="btn-switch-acc" onclick="switchAccount('${acc.id}')">تغییر</button>
+      </div>
+    `;
+  });
+
+  box.innerHTML = html;
+}
+
+function switchAccount(targetId) {
+  if (!targetId) { toast('اکانت نامعتبر است', 'error'); return; }
+  if (targetId === state.me.id) return;
+
+  const targetIdx = state.accounts.findIndex(a => a.id === targetId);
+  if (targetIdx === -1) { toast('اکانت پیدا نشد', 'error'); return; }
+
+  const currentUser = state.me;
+  const newUser = state.accounts[targetIdx];
+  state.accounts[targetIdx] = currentUser;
+  state.me = newUser;
+
+  if (!Array.isArray(state.me.chats)) state.me.chats = [];
+  if (!Array.isArray(state.me.contacts)) state.me.contacts = [];
+
+  save();
+  renderSettings();
+  renderChatList();
+  renderContacts();
+  renderTopProfile();
+  switchTab('chats');
+  toast('اکانت تغییر کرد ✓', 'success');
+}
+
+function openAddAccountModal() {
+  $('#new-acc-name').value = '';
+  $('#new-acc-username').value = '';
+  $('#add-account-modal').classList.add('show');
+}
+
+$('#btn-save-new-acc').addEventListener('click', () => {
+  const name = $('#new-acc-name').value.trim();
+  const username = $('#new-acc-username').value.trim().replace(/@/g, '');
+  
+  if (!name) { toast('نام نمی‌تواند خالی باشد', 'error'); return; }
+  if (username && userTaken(username, 'me')) { toast('این آیدی قبلا گرفته شده', 'error'); return; }
+
+  const newAcc = emptyAccount();
+  newAcc.name = name;
+  newAcc.username = username;
+  newAcc.avatar = { type: 'gradient', value: Math.floor(Math.random() * AV_GRADS.length) };
+
+  state.accounts.push(state.me);
+  state.me = newAcc;
+
+  save();
+  renderSettings();
+  renderChatList();
+  renderContacts();
+  renderTopProfile();
+  switchTab('chats');
+  $('#add-account-modal').classList.remove('show');
+  toast('اکانت جدید ساخته شد ✓', 'success');
+});
+
+$('#btn-cancel-add-acc').addEventListener('click', () => $('#add-account-modal').classList.remove('show'));
+
+let currentModTargetId = null;
+
+function openWarnModal(chatId) {
+  currentModTargetId = chatId;
+  $('#warn-reason-input').value = '';
+  $('#warn-modal').classList.add('show');
+}
+
+function banUser(chatId) {
+  const chat = getChat(chatId);
+  if (!chat) return;
+  
+  showConfirm('بن کاربر', `آیا از بن کردن "${chat.name}" مطمئن هستید؟ دسترسی این کاربر قطع می‌شود.`, () => {
+    if (!state.bannedUsers.includes(chat.username || chat.name)) {
+      state.bannedUsers.push(chat.username || chat.name);
+    }
+    state.chats = state.chats.filter(c => c.id !== chatId);
+    state.contacts = state.contacts.filter(c => c.id !== chatId);
+    
+    closeChat();
+    closeInfo();
+    renderChatList();
+    save();
+    toast('کاربر بن شد ⛔', 'error');
+  });
 }
 
 /* ---------- render: messages ---------- */
@@ -566,6 +763,17 @@ function renderReactions(m) {
     const mine = names.includes('من');
     return `<button class="reaction-pill${mine?' mine':''}" data-react-emoji="${esc(emoji)}" data-react-msg="${esc(m.id)}"><span>${emoji}</span><span class="rp-count">${count.toLocaleString('fa-IR')}</span></button>`;
   }).join('')}</div>`;
+}
+
+function votePoll(chatId, msgId, optIdx) {
+  const chat = getChat(chatId);
+  if (!chat) return;
+  const m = chat.messages.find(x => x.id === msgId);
+  if (!m || !m.poll || m.poll.votedIndex !== null) return;
+  m.poll.options[optIdx].votes++;
+  m.poll.votedIndex = optIdx;
+  save();
+  if (activeChatId === chatId) renderMessages(false);
 }
 
 function msgHTML(chat, m, prevMsg, nextMsg) {
@@ -604,6 +812,20 @@ function msgHTML(chat, m, prevMsg, nextMsg) {
   } else if (m.type === 'voice') {
     const bars = Array.from({length:22},(_,i) => `<i style="height:${7+((i*13+(m.dur||3)*7)%16)}px"></i>`).join('');
     inner += `<div class="voice"><button class="vplay" data-play="${m.id}">${icon('play',16)}</button><div class="vwave">${bars}</div><span class="vdur">${fmtDur(m.dur||0)}</span></div>`;
+  } else if (m.type === 'poll') {
+    const totalVotes = m.poll.options.reduce((sum, o) => sum + o.votes, 0);
+    const hasVoted = m.poll.votedIndex !== null;
+    inner += `<div class="poll-container" onclick="event.stopPropagation();">
+      <div class="poll-q">${esc(m.poll.question)}</div>
+      ${m.poll.options.map((opt, i) => {
+        const pct = totalVotes === 0 ? 0 : Math.round((opt.votes / totalVotes) * 100);
+        return `<div class="poll-opt ${m.poll.votedIndex===i?'voted':''}" onclick="votePoll('${chat.id}','${m.id}',${i})">
+          <div class="poll-opt-bar" style="width:${hasVoted ? pct : 0}%"></div>
+          <div class="poll-opt-text"><span>${esc(opt.text)}</span> ${hasVoted ? `<span>${pct}%</span>` : ''}</div>
+        </div>`;
+      }).join('')}
+      <div class="poll-footer">${totalVotes.toLocaleString('fa-IR')} رای ${hasVoted ? '· شما رای داده‌اید' : ''}</div>
+    </div>`;
   } else {
     inner += `<div class="btext">${msgSearchQuery ? highlightMatch(m.text, msgSearchQuery) : renderRichText(m.text)}</div>`;
     if (m.linkPreview && m.linkPreview.domain) {
@@ -716,7 +938,7 @@ function renderChatHeader() {
     }
   }
   const nameEl = $('#chat-name');
-  if (nameEl) nameEl.innerHTML = nameWithVf(c.name, c.verified, 16);
+  if (nameEl) nameEl.innerHTML = nameWithVf(c.name, c.verified, 20);
   const status = $('#chat-status');
   if (status) { status.textContent = chatStatus(c); status.style.color = c.typing ? 'var(--green)' : ''; }
 }
@@ -815,7 +1037,7 @@ function renderInfo() {
   const joinLeave = isGC ? `<div class="profile-actions">${isJoined?`<button class="btn-leave" data-info-act="leave-chat">${icon('logout',18)} ترک</button>`:`<button class="btn-join" data-info-act="join-chat">${icon('login',18)} عضویت</button>`}</div>` : '';
 
   $('#info-body').innerHTML = `
-    <div class="info-hero ${isGC?'has-cover':''}">${cover}<div class="avatar big ${isGC?'info-avatar-overlay':''}" id="info-avatar-btn" style="${avatarBgStyle(c)}">${avatarContent(c)}</div><div class="info-name">${esc(c.name)}${c.verified?vfHTML(24):''}</div>${uBlock}${badges?`<div class="info-badges">${badges}</div>`:''}${stats}</div>
+    <div class="info-hero ${isGC?'has-cover':''}">${cover}<div class="avatar big ${isGC?'info-avatar-overlay':''}" id="info-avatar-btn" style="${avatarBgStyle(c)}">${avatarContent(c)}</div><div class="info-name">${esc(c.name)}${c.verified?vfHTML(26):''}</div>${uBlock}${badges?`<div class="info-badges">${badges}</div>`:''}${stats}</div>
     ${desc}${settingsGrp}${permsGrp}${membersList}${joinLeave}
     <div class="section-title">عملیات</div>
     <div class="group">
@@ -940,16 +1162,36 @@ function handleInfoAction(act, c) {
 /* ---------- profile preview ---------- */
 function openProfilePreview(username) {
   const f = findByUsername(username);
-  if (!f) { toast('آیدی پیدا نشد'); return; }
+  if (!f) { toast('آیدی پیدا نشد', 'error'); return; }
   const e = f.entity;
+
+  if (state.bannedUsers.includes(e.username || e.name)) {
+    document.body.classList.add('in-profile');
+    $('#profile-body').innerHTML = `
+      <div class="empty" style="margin-top:80px;">
+        ${icon('ban', 80)}
+        <div class="ttl" style="color:var(--red)">حساب مسدود شده</div>
+        این کاربر به دلیل نقض قوانین بن شده است.
+      </div>
+    `;
+    $('#screen-profile').classList.add('open');
+    return;
+  }
+
   document.body.classList.add('in-profile');
   const isGC = e.type === 'group' || e.type === 'channel';
-  const isJoined = state.chats.find(x => x.id === e.id);
+  const isJoined = state.chats.find(x => x.id === e.id || (e.username && x.username === e.username));
   const cover = isGC
     ? `<div class="profile-cover ${e.coverPhoto?'':'empty'}" style="${e.coverPhoto?`background-image:url(&quot;${esc(safeUrlCss(e.coverPhoto))}&quot;)`:''}">${e.coverPhoto?'':'بدون کاور'}</div>`
     : `<div class="profile-cover empty"></div>`;
   const stats = isGC ? `<div class="info-stat">${icon('users',16)} <b>${(e.members||0).toLocaleString('fa-IR')}</b> عضو</div>` : '';
-  const actions = isGC ? (isJoined ? `<button class="btn-leave" id="pp-open">${icon('chat-outline',18)} باز کردن چت</button>` : `<button class="btn-join" id="pp-join">${icon('login',18)} عضویت</button>`) : '';
+  
+  let actionBtn = '';
+  if (isGC) {
+    actionBtn = isJoined ? `<button class="btn-leave" id="pp-open">${icon('chat-outline',18)} باز کردن چت</button>` : `<button class="btn-join" id="pp-join">${icon('login',18)} عضویت</button>`;
+  } else {
+    actionBtn = `<button class="btn-join" id="pp-msg" style="background:#6c6c6e; color:#fff;">${icon('chat-outline',18)} ارسال پیام</button>`;
+  }
 
   $('#profile-body').innerHTML = `
     <div class="profile-preview-hero">${cover}
@@ -965,7 +1207,7 @@ function openProfilePreview(username) {
       </div>
     </div>
     ${e.description?`<div class="profile-desc">${esc(e.description)}</div>`:''}
-    ${actions?`<div class="profile-actions">${actions}</div>`:''}
+    <div class="profile-actions">${actionBtn}</div>
   `;
   $('#screen-profile').classList.add('open');
 
@@ -974,13 +1216,33 @@ function openProfilePreview(username) {
     const di = (state.directory||[]).findIndex(d => d.id === e.id);
     let src = e;
     if (di >= 0) { src = state.directory[di]; src.joined = true; }
-    if (!state.chats.find(x => x.id === e.id)) { const cp = JSON.parse(JSON.stringify(src)); cp.joined = true; state.chats.push(cp); }
+    if (!state.chats.find(x => x.id === e.id || (e.username && x.username === e.username))) {
+      const cp = JSON.parse(JSON.stringify(src)); cp.id = rid(); cp.joined = true; state.chats.push(cp);
+    }
     save(); closeProfilePreview(); renderChatList(); toast('عضو شدی ✓');
-    setTimeout(() => openChat(e.id), 200);
+    setTimeout(() => {
+      const newChat = state.chats.find(x => x.username === e.username);
+      if(newChat) openChat(newChat.id);
+    }, 200);
   };
   const ob = $('#pp-open');
-  if (ob) ob.onclick = () => { closeProfilePreview(); setTimeout(() => openChat(e.id), 150); };
+  if (ob) ob.onclick = () => { closeProfilePreview(); setTimeout(() => openChat(isJoined.id), 150); };
+  
+  const mb = $('#pp-msg');
+  if (mb) mb.onclick = () => {
+    let chat = state.chats.find(c => c.username && normUser(c.username) === normUser(e.username));
+    if (!chat) {
+      chat = {
+        id: rid(), name: e.name, username: e.username, type: 'private',
+        avatar: e.avatar, verified: e.verified, unread: 0, pinned: false, muted: false,
+        draft: '', messages: [], createdAt: Date.now(), joined: true
+      };
+      state.chats.push(chat);
+    }
+    save(); closeProfilePreview(); renderChatList(); openChat(chat.id);
+  };
 }
+
 function closeProfilePreview() {
   document.body.classList.remove('in-profile');
   $('#screen-profile').classList.remove('open');
@@ -1052,8 +1314,9 @@ function simFakeReactions(chat, m) {
   };
   setTimeout(tick, 1000+Math.random()*1500);
 }
+
 /* =========================================================
-   گپ v10.35 — Part 2: Actions / Events / Init
+   گپ v1.0.0 — Part 2: Actions / Events / Init
    ========================================================= */
 
 /* ---------- reactions ---------- */
@@ -1126,7 +1389,7 @@ function sendMessage(extra = {}, textOverride) {
   const text = textOverride !== undefined ? textOverride : (inp ? inp.value.trim() : '');
   if (!text && !extra.type) return;
   if (chat.permissions && chat.permissions.sendMessages === 'admins' && chat.type === 'group') {
-    toast('فقط مدیران می‌توانند پیام بفرستند'); return;
+    toast('فقط مدیران می‌توانند پیام بفرستند', 'error'); return;
   }
   const m = Object.assign({
     id:rid(), text, out:true, ts:Date.now(), status:'sent', type:'text',
@@ -1138,6 +1401,11 @@ function sendMessage(extra = {}, textOverride) {
     if (u) m.linkPreview = buildLinkPreview(u);
   }
   chat.messages.push(m);
+  
+  if (chat.type === 'private' && chat.username) {
+    syncMessageToTargetAccount(chat.username, m, state.me);
+  }
+
   if (textOverride === undefined && inp) {
     inp.value = '';
     chat.draft = '';
@@ -1148,7 +1416,7 @@ function sendMessage(extra = {}, textOverride) {
   replyToMsg = null; hideReplyBar();
   renderMessages(); renderChatList();
   if (chat.type === 'channel') startSeenSim(chat, m);
-  if (chat.type !== 'saved') simFakeReactions(chat, m);
+  if (chat.type !== 'saved' && m.type !== 'poll') simFakeReactions(chat, m);
   setTimeout(() => { m.status = 'delivered'; if (activeChatId === chat.id) renderMessages(false); save(); }, 600);
   setTimeout(() => { m.status = 'read'; if (activeChatId === chat.id) renderMessages(false); save(); }, 1700);
   if (chat.type === 'ai') { if (state.settings.aiMode && navigator.onLine) scheduleAIReply(chat, m.text); else scheduleReply(chat); return; }
@@ -1331,7 +1599,7 @@ async function startRec() {
     mediaRecorder.ondataavailable = ev => { if (ev.data.size > 0) chunks.push(ev.data); };
     mediaRecorder.start();
   } catch {
-    toast('دسترسی به میکروفون داده نشد');
+    toast('دسترسی به میکروفون داده نشد', 'error');
     recActive = false;
     $('#composer').style.display = 'flex';
     $('#rec-bar').classList.remove('show');
@@ -1359,18 +1627,18 @@ function stopRec(cancel) {
     mediaRecorder.onstop = () => {
       const blob = new Blob(chunks, {type:mediaRecorder.mimeType || 'audio/webm'});
       cleanup();
-      if (cancel || dur < 0.8) { toast('ضبط لغو شد'); return; }
+      if (cancel || dur < 0.8) { toast('ضبط لغو شد', 'info'); return; }
       const reader = new FileReader();
       reader.onload = () => {
         sendMessage({ type:'voice', dur:Math.round(dur*10)/10, dataUrl:reader.result, size:fmtBytes(blob.size) }, '');
-        toast('پیام صوتی ارسال شد');
+        toast('پیام صوتی ارسال شد', 'success');
       };
       reader.readAsDataURL(blob);
     };
     try { mediaRecorder.stop(); } catch { cleanup(); }
   } else {
     cleanup();
-    if (!cancel && dur >= 0.8) toast('ضبط صدا ممکن نشد');
+    if (!cancel && dur >= 0.8) toast('ضبط صدا ممکن نشد', 'error');
   }
 }
 
@@ -1466,7 +1734,7 @@ $('#messages').addEventListener('click', e => {
 let lastTapTime = 0, lastTapId = null;
 $('#messages').addEventListener('pointerup', e => {
   if (e.target.closest('.mention-preview') || e.target.closest('.mention-link') ||
-      e.target.closest('.link-preview') || e.target.closest('.reaction-pill')) return;
+      e.target.closest('.link-preview') || e.target.closest('.reaction-pill') || e.target.closest('.poll-opt')) return;
   const el = e.target.closest('.msg');
   if (!el) return;
   const now = Date.now();
@@ -1481,7 +1749,7 @@ $('#messages').addEventListener('pointerup', e => {
 let pressTimer = null, pressStart = null, pressedMsgEl = null;
 $('#messages').addEventListener('pointerdown', e => {
   if (e.target.closest('.reaction-pill') || e.target.closest('.mention-preview') ||
-      e.target.closest('.mention-link') || e.target.closest('.link-preview')) return;
+      e.target.closest('.mention-link') || e.target.closest('.link-preview') || e.target.closest('.poll-opt')) return;
   const el = e.target.closest('.msg');
   if (!el || el.classList.contains('typing')) return;
   pressStart = {x:e.clientX, y:e.clientY};
@@ -1548,44 +1816,44 @@ function saveToSaved(chat, m) {
   }
   saved.messages.push({
     id:rid(), text:m.text, out:true, ts:Date.now(), status:'sent', type:m.type, replyTo:null,
-    dur:m.dur, bg:m.bg, size:m.size, dataUrl:m.dataUrl, savedFrom:chat.name, originalSender:m.sender||null,
+    dur:m.dur, bg:m.bg, size:m.size, dataUrl:m.dataUrl, savedFrom:chat.name, originalSender:m.sender||null, poll:m.poll,
     reactions:{}, deleted:false, editedForAll:false, seenCount:0, seenTarget:0, linkPreview:m.linkPreview||null, _fakeReactionCounts:{}
   });
-  save(); renderChatList(); toast('ذخیره شد ✓');
+  save(); renderChatList(); toast('ذخیره شد ✓', 'success');
 }
 
 function handleMsgAction(act, chat, m) {
   if (act === 'reply') { showReplyBar(m); return; }
-  if (act === 'copy') { copyClip(m.text||'').then(()=>toast('کپی شد'), ()=>toast('کپی نشد')); return; }
+  if (act === 'copy') { copyClip(m.text||'').then(()=>toast('کپی شد', 'success'), ()=>toast('کپی نشد', 'error')); return; }
   if (act === 'edit') {
     showPrompt('ویرایش پیام', m.text, val => {
       if (!val.trim()) return;
       m.text = val.trim(); m.editedForAll = true; m.edited = true;
       const u = firstUrl(m.text); m.linkPreview = u ? buildLinkPreview(u) : null;
-      renderMessages(false); renderChatList(); save(); toast('ویرایش شد');
+      renderMessages(false); renderChatList(); save(); toast('ویرایش شد', 'success');
     }); return;
   }
   if (act === 'save') { saveToSaved(chat, m); return; }
   if (act === 'forward') {
-    if (!state.chats.length) { toast('چتی برای هدایت نیست'); return; }
+    if (!state.chats.length) { toast('چتی برای هدایت نیست', 'error'); return; }
     openSheet(`<div class="sheet-title">هدایت به…</div>` + state.chats.map(c => `<div class="sheet-item" data-fwd="${c.id}">${avatarHTML(c,38)}${esc(c.name)}</div>`).join(''));
     $$('#sheet-content [data-fwd]').forEach(b => b.addEventListener('click', () => {
       const t = getChat(b.dataset.fwd);
-      t.messages.push({ id:rid(), text:m.text, out:true, ts:Date.now(), status:'sent', type:m.type, replyTo:null, dur:m.dur, bg:m.bg, size:m.size, dataUrl:m.dataUrl, forwarded:true, originalSender:m.sender||null, reactions:{}, deleted:false, editedForAll:false, seenCount:0, seenTarget:0, linkPreview:m.linkPreview||null, _fakeReactionCounts:{} });
-      closeSheet(); renderChatList(); save(); toast('هدایت شد');
+      t.messages.push({ id:rid(), text:m.text, out:true, ts:Date.now(), status:'sent', type:m.type, replyTo:null, dur:m.dur, bg:m.bg, size:m.size, dataUrl:m.dataUrl, forwarded:true, originalSender:m.sender||null, poll:m.poll, reactions:{}, deleted:false, editedForAll:false, seenCount:0, seenTarget:0, linkPreview:m.linkPreview||null, _fakeReactionCounts:{} });
+      closeSheet(); renderChatList(); save(); toast('هدایت شد', 'success');
     })); return;
   }
   if (act === 'delete-all') {
     showConfirm('حذف برای همه', 'این پیام برای همه حذف شود؟', () => {
       m.deleted = true; m.text = ''; m.dataUrl = null; m.linkPreview = null;
       m.reactions = {}; m._fakeReactionCounts = {};
-      renderMessages(false); renderChatList(); save(); toast('حذف شد');
+      renderMessages(false); renderChatList(); save(); toast('حذف شد', 'success');
     }); return;
   }
   if (act === 'delete') {
     showConfirm('حذف پیام', 'فقط برای شما حذف شود؟', () => {
       chat.messages = chat.messages.filter(x => x.id !== m.id);
-      renderMessages(false); renderChatList(); save(); toast('حذف شد');
+      renderMessages(false); renderChatList(); save(); toast('حذف شد', 'success');
     }); return;
   }
 }
@@ -1663,16 +1931,16 @@ function showChatMenu(id) {
     closeSheet();
     setTimeout(() => {
       if (act === 'open') { openChat(c.id); return; }
-      if (act === 'verified') { c.verified = !c.verified; toast(c.verified?'تیک داده شد':'برداشته شد'); renderChatList(); save(); return; }
-      if (act === 'pin') { c.pinned = !c.pinned; toast(c.pinned?'سنجاق شد':'برداشته شد'); renderChatList(); save(); return; }
-      if (act === 'mute') { c.muted = !c.muted; toast(c.muted?'بی‌صدا شد':'اعلان فعال'); renderChatList(); save(); return; }
+      if (act === 'verified') { c.verified = !c.verified; toast(c.verified?'تیک داده شد':'برداشته شد', 'info'); renderChatList(); save(); return; }
+      if (act === 'pin') { c.pinned = !c.pinned; toast(c.pinned?'سنجاق شد':'برداشته شد', 'info'); renderChatList(); save(); return; }
+      if (act === 'mute') { c.muted = !c.muted; toast(c.muted?'بی‌صدا شد':'اعلان فعال', 'info'); renderChatList(); save(); return; }
       if (act === 'info') { openInfo(c.id); return; }
-      if (act === 'read') { c.unread = 0; renderChatList(); save(); toast('خوانده شد'); return; }
+      if (act === 'read') { c.unread = 0; renderChatList(); save(); toast('خوانده شد', 'success'); return; }
       if (act === 'delete') {
         showConfirm('حذف گفتگو', 'کل این گفتگو حذف شود؟', () => {
           state.chats = state.chats.filter(x => x.id !== c.id);
           state.contacts = state.contacts.filter(x => x.id !== c.id);
-          renderChatList(); renderContacts(); save(); toast('حذف شد');
+          renderChatList(); renderContacts(); save(); toast('حذف شد', 'success');
         }); return;
       }
     }, 120);
@@ -1779,7 +2047,7 @@ function applyAvatarChange() {
     if (activeChatId === avatarTarget) renderChatHeader();
     if (infoChatId === avatarTarget) renderInfo();
   } else if (avatarTargetType === 'contact') renderContacts();
-  toast('ذخیره شد');
+  toast('ذخیره شد', 'success');
 }
 
 function openAvatarPicker(t, id) {
@@ -1836,6 +2104,39 @@ if (_btnFile) _btnFile.addEventListener('click', () => {
   sendMessage({type:'file', text:'document.pdf', size:'1.8 MB'}, '');
 });
 
+const _btnPoll = $('#btn-poll');
+if (_btnPoll) _btnPoll.addEventListener('click', () => {
+  $('#poll-q-input').value = '';
+  $('#poll-options-container').innerHTML = `
+    <input type="text" class="poll-opt-input" placeholder="گزینه ۱" style="margin-bottom: 6px; width: 100%; margin: 0 0 6px 0;">
+    <input type="text" class="poll-opt-input" placeholder="گزینه ۲" style="margin-bottom: 6px; width: 100%; margin: 0 0 6px 0;">
+  `;
+  $('#poll-modal').classList.add('show');
+});
+
+const _btnAddPollOpt = $('#btn-add-poll-opt');
+if (_btnAddPollOpt) _btnAddPollOpt.addEventListener('click', () => {
+  const container = $('#poll-options-container');
+  if (container.children.length >= 4) { toast('حداکثر ۴ گزینه', 'error'); return; }
+  const input = document.createElement('input');
+  input.type = 'text'; input.className = 'poll-opt-input'; input.placeholder = `گزینه ${container.children.length + 1}`;
+  input.style.marginBottom = '6px'; input.style.width = '100%'; input.style.margin = '0 0 6px 0';
+  container.appendChild(input);
+});
+
+const _btnCancelPoll = $('#btn-cancel-poll');
+if (_btnCancelPoll) _btnCancelPoll.addEventListener('click', () => $('#poll-modal').classList.remove('show'));
+
+const _btnSendPoll = $('#btn-send-poll');
+if (_btnSendPoll) _btnSendPoll.addEventListener('click', () => {
+  const q = $('#poll-q-input').value.trim();
+  const opts = Array.from(document.querySelectorAll('.poll-opt-input')).map(i => i.value.trim()).filter(Boolean);
+  if (!q || opts.length < 2) { toast('سوال و حداقل ۲ گزینه لازم است', 'error'); return; }
+  const pollData = { question: q, options: opts.map(o => ({ text: o, votes: 0 })), votedIndex: null };
+  sendMessage({ type: 'poll', poll: pollData, text: q }, '');
+  $('#poll-modal').classList.remove('show');
+});
+
 const _btnEmoji = $('#btn-emoji');
 if (_btnEmoji) _btnEmoji.addEventListener('click', openEmoji);
 
@@ -1869,6 +2170,10 @@ $('#btn-chat-menu').addEventListener('click', () => {
   const memberItem = (c.type === 'group' || c.type === 'channel') ? `<div class="sheet-item" data-cact="members">${icon('users')}تعداد اعضا (${(c.members||0).toLocaleString('fa-IR')})</div>` : '';
   const coverItem = (c.type === 'group' || c.type === 'channel') ? `<div class="sheet-item" data-cact="cover">${icon('image')}${c.coverPhoto?'تغییر کاور':'افزودن کاور'}</div>` : '';
   const descItem = (c.type === 'group' || c.type === 'channel') ? `<div class="sheet-item" data-cact="desc">${icon('file')}${c.description?'ویرایش توضیحات':'افزودن توضیحات'}</div>` : '';
+  
+  const warnBtn = (c.type === 'private' || c.type === 'group') ? `<div class="sheet-item" data-cact="warn" style="color:#f59e0b">${icon('alert')}ارسال اخطار به کاربر</div>` : '';
+  const banBtn = (c.type === 'private' || c.type === 'group') ? `<div class="sheet-item danger" data-cact="ban">${icon('ban')}بن کردن کاربر</div>` : '';
+
   openSheet(`
     <div class="sheet-title">${esc(c.name)}</div>
     <div class="sheet-item" data-cact="search">${icon('search')}جستجو در پیام‌ها</div>
@@ -1880,6 +2185,10 @@ $('#btn-chat-menu').addEventListener('click', () => {
     ${memberItem}
     <div class="sheet-item" data-cact="pin">${icon('pin')}${c.pinned?'برداشتن سنجاق':'سنجاق'}</div>
     <div class="sheet-item" data-cact="mute">${icon(c.muted?'bell':'bell-off')}${c.muted?'فعال کردن اعلان':'بی‌صدا'}</div>
+    
+    ${warnBtn}
+    ${banBtn}
+
     <div class="sheet-item" data-cact="clear">${icon('trash')}پاک کردن تاریخچه</div>
     <div class="sheet-item danger" data-cact="delete">${icon('trash')}حذف گفتگو</div>
   `);
@@ -1887,23 +2196,25 @@ $('#btn-chat-menu').addEventListener('click', () => {
     const act = b.dataset.cact;
     closeSheet();
     setTimeout(() => {
+      if (act === 'warn') { openWarnModal(c.id); return; }
+      if (act === 'ban') { banUser(c.id); return; }
       if (act === 'search') { openMsgSearch(); return; }
       if (act === 'info') { openInfo(c.id); return; }
       if (act === 'avatar') { openAvatarPicker('chat', c.id); return; }
       if (act === 'cover') { pickCoverImage(c); return; }
-      if (act === 'desc') { showPrompt('توضیحات', c.description||'', v => { c.description = v.trim(); renderChatList(); save(); toast('ذخیره شد'); }); return; }
-      if (act === 'verified') { c.verified = !c.verified; toast(c.verified?'تیک داده شد':'برداشته شد'); renderChatList(); renderChatHeader(); save(); return; }
-      if (act === 'rename') { showPrompt('نام جدید', c.name, v => { if (!v.trim()) return; c.name = v.trim(); renderChatHeader(); renderChatList(); save(); toast('تغییر کرد'); }); return; }
-      if (act === 'members') { showPrompt('تعداد اعضا', String(c.members||0), v => { const n = parseInt(v, 10); if (isNaN(n) || n < 0) { toast('عدد معتبر'); return; } c.members = Math.min(n, 9999999); renderChatHeader(); renderChatList(); save(); toast('تغییر کرد'); }); return; }
-      if (act === 'pin') { c.pinned = !c.pinned; toast(c.pinned?'سنجاق':'برداشته شد'); }
-      if (act === 'mute') { c.muted = !c.muted; toast(c.muted?'بی‌صدا':'فعال'); }
-      if (act === 'clear') { c.messages = []; toast('پاک شد'); }
+      if (act === 'desc') { showPrompt('توضیحات', c.description||'', v => { c.description = v.trim(); renderChatList(); save(); toast('ذخیره شد', 'success'); }); return; }
+      if (act === 'verified') { c.verified = !c.verified; toast(c.verified?'تیک داده شد':'برداشته شد', 'info'); renderChatList(); renderChatHeader(); save(); return; }
+      if (act === 'rename') { showPrompt('نام جدید', c.name, v => { if (!v.trim()) return; c.name = v.trim(); renderChatHeader(); renderChatList(); save(); toast('تغییر کرد', 'success'); }); return; }
+      if (act === 'members') { showPrompt('تعداد اعضا', String(c.members||0), v => { const n = parseInt(v, 10); if (isNaN(n) || n < 0) { toast('عدد معتبر', 'error'); return; } c.members = Math.min(n, 9999999); renderChatHeader(); renderChatList(); save(); toast('تغییر کرد', 'success'); }); return; }
+      if (act === 'pin') { c.pinned = !c.pinned; toast(c.pinned?'سنجاق':'برداشته شد', 'info'); }
+      if (act === 'mute') { c.muted = !c.muted; toast(c.muted?'بی‌صدا':'فعال', 'info'); }
+      if (act === 'clear') { c.messages = []; toast('پاک شد', 'success'); }
       if (act === 'delete') {
         showConfirm('حذف', 'کل چت حذف شود؟', () => {
           state.chats = state.chats.filter(x => x.id !== c.id);
           state.contacts = state.contacts.filter(x => x.id !== c.id);
           state.directory = (state.directory||[]).filter(x => x.id !== c.id);
-          closeChat(); renderChatList(); renderContacts(); save(); toast('حذف شد');
+          closeChat(); renderChatList(); renderContacts(); save(); toast('حذف شد', 'success');
         }); return;
       }
       renderChatList(); renderMessages(); save();
@@ -2035,7 +2346,7 @@ $('#search-clear').addEventListener('click', () => {
 $('#btn-new-chat').addEventListener('click', () => {
   openSheet(`
     <div class="sheet-title">گفتگوی جدید</div>
-    <div class="sheet-item" data-nt="private">${icon('user')}گفتگوی شخصی</div>
+    <div class="sheet-item" data-nt="private">${icon('user')}گفتگوی شخصی (با آیدی)</div>
     <div class="sheet-item" data-nt="group">${icon('users')}گروه</div>
     <div class="sheet-item" data-nt="channel">${icon('megaphone')}کانال</div>
     <div class="sheet-item" data-nt="ai">${icon('sparkle')}چت با هوش مصنوعی</div>
@@ -2049,17 +2360,45 @@ $('#btn-new-chat').addEventListener('click', () => {
 });
 
 function promptChatName(type) {
-  const titles = {private:'نام مخاطب', group:'نام گروه', channel:'نام کانال', ai:'نام دستیار', saved:null};
   if (type === 'saved') {
     let ex = state.chats.find(c => c.type === 'saved');
     if (!ex) createChat({name:'پیام‌های ذخیره‌شده', type:'saved'});
-    else { toast('از قبل موجوده'); setTimeout(() => openChat(ex.id), 150); }
+    else { toast('از قبل موجوده', 'info'); setTimeout(() => openChat(ex.id), 150); }
     return;
   }
   if (type === 'ai') { createChat({name:'دستیار گپ', type:'ai', avatar:{type:'gradient',value:4}, verified:true, username:'gap_ai', online:true, joined:true}); return; }
+  
+  if (type === 'private') {
+    showPrompt('آیدی کاربر (بدون @)', '', val => {
+      const username = val.trim().replace(/@/g, '');
+      if (!username) return;
+
+      const f = findByUsername(username);
+      if (f && (f.source === 'local_account' || f.source === 'chat' || f.source === 'directory')) {
+        if (f.entity.type === 'group' || f.entity.type === 'channel') {
+          toast('این یک گروه/کانال است. از بخش کشف عضو شوید.', 'info');
+          return;
+        }
+        let chat = state.chats.find(c => c.username && normUser(c.username) === normUser(username));
+        if (!chat) {
+          chat = { id: rid(), name: f.entity.name, type: 'private', username: f.entity.username, avatar: f.entity.avatar, verified: f.entity.verified, unread: 0, pinned: false, muted: false, draft: '', messages: [], createdAt: Date.now(), joined: true };
+          state.chats.push(chat);
+        }
+        save(); renderChatList(); openChat(chat.id);
+        return;
+      }
+
+      const name = username;
+      const data = { name, type:'private', username: username, avatar:{type:'gradient',value:Math.floor(Math.random()*AV_GRADS.length)}, verified:false, online:Math.random()>.5 };
+      createChat(data);
+    }, {ltr:true});
+    return;
+  }
+
+  const titles = {group:'نام گروه', channel:'نام کانال'};
   showPrompt(titles[type], '', val => {
     const name = val.trim();
-    if (!name) { toast('نام نمی‌تونه خالی باشه'); return; }
+    if (!name) { toast('نام نمی‌تونه خالی باشه', 'error'); return; }
     const data = { name, type, avatar:{type:'gradient',value:Math.floor(Math.random()*AV_GRADS.length)}, verified:false, username:'', isPublic:type === 'channel', description:'', coverPhoto:null, admins:[], permissions:{sendMessages:'all',editInfo:'all'}, joined:true };
     if (type === 'private') data.online = true;
     if (type === 'group' || type === 'channel') {
@@ -2086,7 +2425,7 @@ function promptChatName(type) {
 function askPublicPrivate(data, type) {
   openSheet(`
     <div class="sheet-title">${type === 'channel' ? 'کانال' : 'گروه'} چه نوعی باشد؟</div>
-    <div class="sheet-item" data-pp="public">${icon('globe')}<div style="flex:1"><div style="font-weight:600">عمومی</div><div style="font-size:12px;color:var(--text-3);margin-top:2px">هر کسی پیدا کند</div></div></div>
+    <div class="sheet-item" data-pp="public">${icon('globe')}<div style="flex:1"><div style="font-weight:600">عمومی</div><div style="font-size:12px;color:var(--text-3);margin-top:2px">هر کسی با آیدی پیدا کند</div></div></div>
     <div class="sheet-item" data-pp="private">${icon('lock')}<div style="flex:1"><div style="font-weight:600">خصوصی</div><div style="font-size:12px;color:var(--text-3);margin-top:2px">فقط با دعوت</div></div></div>
   `);
   $$('#sheet-content [data-pp]').forEach(b => b.addEventListener('click', () => {
@@ -2119,8 +2458,14 @@ function createChat(data) {
     description:'', coverPhoto:null, admins:[], permissions:{sendMessages:'all',editInfo:'all'}, joined:true
   }, data);
   state.chats.push(chat);
+
+  if ((chat.type === 'group' || chat.type === 'channel') && chat.isPublic && chat.username) {
+    const exists = state.directory.find(d => d.username === chat.username);
+    if (!exists) state.directory.push(chat);
+  }
+
   save(); renderChatList();
-  toast('«' + chat.name + '» ساخته شد');
+  toast('«' + chat.name + '» ساخته شد', 'success');
   setTimeout(() => openChat(chat.id), 200);
 }
 
@@ -2161,13 +2506,13 @@ $('#settings-body').addEventListener('click', e => {
   const row = e.target.closest('[data-act]');
   if (row) {
     const act = row.dataset.act;
-    if (act === 'edit-name') showPrompt('نام شما', state.me.name, v => { if (!v.trim()) return; state.me.name = v.trim(); renderSettings(); renderChatList(); save(); toast('ذخیره شد'); });
+    if (act === 'edit-name') showPrompt('نام شما', state.me.name, v => { if (!v.trim()) return; state.me.name = v.trim(); renderSettings(); renderChatList(); save(); toast('ذخیره شد', 'success'); });
     if (act === 'edit-username') showPrompt('آیدی شما (بدون @)', state.me.username||'', v => {
       let u = normUser(v);
-      if (!u) { state.me.username = ''; renderSettings(); save(); toast('حذف شد'); return; }
-      if (!validUser(u)) { toast('آیدی فقط انگلیسی + عدد + _-='); return; }
-      if (userTaken(u, 'me')) { toast('گرفته شده'); return; }
-      state.me.username = u; renderSettings(); save(); toast('ذخیره شد: @'+u);
+      if (!u) { state.me.username = ''; renderSettings(); save(); toast('حذف شد', 'info'); return; }
+      if (!validUser(u)) { toast('آیدی فقط انگلیسی + عدد + _-=', 'error'); return; }
+      if (userTaken(u, 'me')) { toast('گرفته شده', 'error'); return; }
+      state.me.username = u; renderSettings(); save(); toast('ذخیره شد: @'+u, 'success');
     }, {ltr:true});
     if (act === 'edit-phone') {
       const cur = state.me.phone || '+98 ';
@@ -2179,17 +2524,17 @@ $('#settings-body').addEventListener('click', e => {
           num = num.replace(/^(\+98)\s*(\d{3})\s*(\d{3})\s*(\d{4}).*$/, '$1 $2 $3 $4');
           state.me.phone = num;
         }
-        renderSettings(); save(); toast('ذخیره شد');
+        renderSettings(); save(); toast('ذخیره شد', 'success');
       }, {ltr:true, placeholder:'+98 912 345 6789'});
     }
-    if (act === 'toggle-theme') { state.theme = state.theme === 'light' ? 'dark' : 'light'; applyTheme(); renderSettings(); save(); toast(state.theme === 'light' ? 'تم روشن' : 'تم تاریک'); }
+    if (act === 'toggle-theme') { state.theme = state.theme === 'light' ? 'dark' : 'light'; applyTheme(); renderSettings(); save(); toast(state.theme === 'light' ? 'تم روشن' : 'تم تاریک', 'info'); }
     if (act === 'export') exportBackup();
     if (act === 'import') {
       const inp = document.createElement('input');
       inp.type = 'file'; inp.accept = '.json,application/json';
       inp.onchange = async () => {
         const f = inp.files[0]; if (!f) return;
-        try { await importBackup(f); toast('بازیابی شد ✓'); } catch { toast('فایل نامعتبر'); }
+        try { await importBackup(f); toast('بازیابی شد ✓', 'success'); } catch { toast('فایل نامعتبر', 'error'); }
       };
       inp.click();
     }
@@ -2197,7 +2542,7 @@ $('#settings-body').addEventListener('click', e => {
       showConfirm('پاک کردن همه', 'تمام داده‌ها حذف شوند؟', () => {
         localStorage.removeItem(KEY); localStorage.removeItem(BACKUP_KEY);
         state = emptyState(); applyTheme();
-        renderChatList(); renderSettings(); renderContacts(); toast('پاک شد');
+        renderChatList(); renderSettings(); renderContacts(); toast('پاک شد', 'info');
       });
     }
   }
@@ -2207,20 +2552,20 @@ $('#settings-body').addEventListener('click', e => {
     const key = sw.dataset.set;
     state.settings[key] = sw.checked;
     save();
-    if (key === 'aiMode') { toast(sw.checked ? 'پاسخ هوشمند فعال' : 'غیرفعال'); if (activeChatId) renderChatHeader(); }
+    if (key === 'aiMode') { toast(sw.checked ? 'پاسخ هوشمند فعال' : 'غیرفعال', 'info'); if (activeChatId) renderChatHeader(); }
     if (key === 'notifications' && sw.checked) {
       requestNotifPermission().then(() => {
-        if (Notification.permission === 'granted') toast('نوتیفیکیشن فعال');
-        else if (Notification.permission === 'denied') { toast('مرورگر اجازه نداد'); state.settings.notifications = false; renderSettings(); save(); }
+        if (Notification.permission === 'granted') toast('نوتیفیکیشن فعال', 'success');
+        else if (Notification.permission === 'denied') { toast('مرورگر اجازه نداد', 'error'); state.settings.notifications = false; renderSettings(); save(); }
       });
     }
     if (key === 'autoBackup' && sw.checked) {
       try { localStorage.setItem(BACKUP_KEY, JSON.stringify(state)); } catch {}
-      toast('پشتیبان‌گیری خودکار فعال');
+      toast('پشتیبان‌گیری خودکار فعال', 'success');
     }
   }
   const meSw = e.target.closest('input[data-me]');
-  if (meSw) { state.me[meSw.dataset.me] = meSw.checked; renderSettings(); renderChatList(); save(); toast(state.me.verified ? 'تیک فعال' : 'تیک غیرفعال'); }
+  if (meSw) { state.me[meSw.dataset.me] = meSw.checked; renderSettings(); renderChatList(); save(); toast(state.me.verified ? 'تیک فعال' : 'تیک غیرفعال', 'info'); }
 });
 
 /* ---------- backup ---------- */
@@ -2235,9 +2580,9 @@ function exportBackup(silent = false) {
     a.href = url; a.download = `gap-backup-${date}.json`;
     a.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
-    if (!silent) toast('پشتیبان دانلود شد ✓');
+    if (!silent) toast('پشتیبان دانلود شد ✓', 'success');
     return true;
-  } catch { if (!silent) toast('پشتیبان‌گیری ناموفق'); return false; }
+  } catch { if (!silent) toast('پشتیبان‌گیری ناموفق', 'error'); return false; }
 }
 
 function importBackup(file) {
@@ -2248,18 +2593,22 @@ function importBackup(file) {
         const data = JSON.parse(r.result);
         if (!data || !Array.isArray(data.chats)) throw new Error('bad');
         closeChat(); closeInfo(); closeProfilePreview();
-        if (!data.me) data.me = emptyState().me;
-        if (!data.me.avatar) data.me.avatar = {type:'gradient',value:3};
-        if (typeof data.me.verified !== 'boolean') data.me.verified = false;
-        if (typeof data.me.username !== 'string') data.me.username = '';
-        if (!data.settings) data.settings = emptyState().settings;
-        if (!Array.isArray(data.contacts)) data.contacts = [];
-        if (!Array.isArray(data.directory)) data.directory = [];
-        if (data.theme !== 'light' && data.theme !== 'dark') data.theme = 'dark';
-        if (typeof data.lastBackupAt !== 'number') data.lastBackupAt = 0;
-        data.chats = data.chats.map(normalizeChat);
-        data.directory = data.directory.map(normalizeChat);
-        state = data;
+        
+        let imported = load(); 
+        if (imported) {
+            state = imported;
+        } else {
+            state = emptyState();
+            if (data.me) state.me = normalizeAccount(data.me);
+            if (Array.isArray(data.accounts)) state.accounts = data.accounts.map(normalizeAccount);
+            if (Array.isArray(data._globalDirectory)) state._globalDirectory = data._globalDirectory.map(normalizeChat);
+            else if (Array.isArray(data.directory)) state._globalDirectory = data.directory.map(normalizeChat);
+            if (Array.isArray(data.chats)) state.me.chats = data.chats.map(normalizeChat);
+            if (Array.isArray(data.contacts)) state.me.contacts = data.contacts;
+            if (data.settings) state.settings = Object.assign(emptyState().settings, data.settings);
+            if (data.theme) state.theme = data.theme;
+        }
+
         localStorage.setItem(KEY, JSON.stringify(state));
         localStorage.setItem(BACKUP_KEY, JSON.stringify(state));
         applyTheme();
@@ -2295,8 +2644,8 @@ function showBackupWelcome() {
     inp.type = 'file'; inp.accept = '.json,application/json';
     inp.onchange = async () => {
       const f = inp.files[0]; if (!f) return;
-      try { await importBackup(f); ov.classList.remove('show'); toast('بازیابی موفق ✓'); }
-      catch { toast('فایل نامعتبر'); }
+      try { await importBackup(f); ov.classList.remove('show'); toast('بازیابی موفق ✓', 'success'); }
+      catch { toast('فایل نامعتبر', 'error'); }
     };
     inp.click();
   };
@@ -2335,6 +2684,9 @@ document.addEventListener('keydown', e => {
     else if (emojiOverlay.classList.contains('show')) emojiOverlay.classList.remove('show');
     else if (avatarOverlay.classList.contains('show')) closeAvatarPicker();
     else if (modalOverlay.classList.contains('show')) modalOverlay.classList.remove('show');
+    else if ($('#add-account-modal').classList.contains('show')) $('#add-account-modal').classList.remove('show');
+    else if ($('#warn-modal').classList.contains('show')) $('#warn-modal').classList.remove('show');
+    else if ($('#poll-modal').classList.contains('show')) $('#poll-modal').classList.remove('show');
     else if ($('#screen-profile').classList.contains('open')) closeProfilePreview();
     else if ($('#screen-info').classList.contains('open')) closeInfo();
     else if ($('#screen-chat').classList.contains('open')) closeChat();
