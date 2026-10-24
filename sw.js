@@ -1,4 +1,4 @@
-const CACHE = 'gap-v43';
+const CACHE = 'gap-v1.0.0'; // نسخه کش با نسخه برنامه یکسان شد
 const ASSETS = [
   './',
   './index.html',
@@ -6,7 +6,7 @@ const ASSETS = [
   './script.js',
   './manifest.json',
   './Logo.png',
-  'https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css'
+  './Font.ttf' // فونت محلی به لیست کش اضافه شد
 ];
 
 self.addEventListener('install', e => {
