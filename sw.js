@@ -1,4 +1,4 @@
-const CACHE = 'gap-v1.0.0'; // نسخه کش با نسخه برنامه یکسان شد
+const CACHE = 'gap-v1.0.1'; // نسخه کش با نسخه برنامه یکسان شد
 const ASSETS = [
   './',
   './index.html',
