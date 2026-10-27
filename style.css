@@ -56,13 +56,14 @@ html[data-theme="light"]{
 
 html,body{
   margin:0;padding:0;width:100%;min-height:100%;
+  background-color: transparent !important;
   font-family:'CustomFont', -apple-system, BlinkMacSystemFont, Tahoma, sans-serif;
   font-feature-settings:"ss01","kern";
-  background:var(--bg);color:var(--text);
+  color:var(--text);
   -webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;
   text-rendering:optimizeLegibility;letter-spacing:-.1px;font-weight:400;
   -webkit-user-select:none;user-select:none;-webkit-touch-callout:none;
-  transition:background .3s,color .3s;overscroll-behavior-y:none;
+  transition:color .3s;overscroll-behavior-y:none;
 }
 
 #app{position:fixed;top:0;left:0;right:0;bottom:0;width:100%;height:100%;overflow:hidden;background:var(--bg);display:flex;flex-direction:column;}
@@ -111,19 +112,44 @@ button svg{fill:currentColor;display:block;flex-shrink:0}
 #screen-list .main-hdr > *{pointer-events:auto;}
 #screen-list .main-hdr .hdr-title{position:static!important;flex:1!important;display:flex;align-items:center;justify-content:center;font-size:20px;padding:0;overflow:hidden;}
 
-.circle-btn{width:46px;height:46px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:rgba(24,24,24,.72);backdrop-filter:blur(16px) saturate(160%);-webkit-backdrop-filter:blur(16px) saturate(160%);border:none;border-top:2px solid #414141;border-bottom:2px solid #414141;color:var(--accent-2);flex-shrink:0;transition:background .2s,transform .15s;padding:0;box-sizing:border-box;touch-action:manipulation;user-select:none;cursor:pointer;}
-.circle-btn:hover{background:rgba(31,31,31,.85)}
-.circle-btn:active{transform:scale(.94);background:rgba(37,37,37,.9)}
-.circle-btn svg{fill:currentColor;pointer-events:none}
+/* =========================================
+   دکمه‌ها و هدرهای شیشه‌ای (۸۰٪ شفافیت / بلور بالا)
+   ========================================= */
+
+.circle-btn {
+    width: 46px; height: 46px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(24, 24, 24, 0.2); /* شفافیت ۸۰ درصد */
+    backdrop-filter: blur(25px) saturate(180%);
+    -webkit-backdrop-filter: blur(25px) saturate(180%);
+    border: none; 
+    border-top: 1px solid rgba(255, 255, 255, 0.15); 
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    color: var(--accent-2); flex-shrink: 0; transition: background .2s, transform .15s;
+    padding: 0; box-sizing: border-box; touch-action: manipulation; user-select: none; cursor: pointer;
+}
+.circle-btn:hover { background: rgba(24, 24, 24, 0.4); }
+.circle-btn:active { transform: scale(.94); background: rgba(24, 24, 24, 0.6); }
+.circle-btn svg { fill: currentColor; pointer-events: none; }
 
 .profile-circle-btn{padding:4px;}
 .profile-square{width:98%;height:98%;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:#fff;background-size:cover;background-position:center;background-repeat:no-repeat;overflow:hidden;pointer-events:none;}
 
-.brand-pill{height:46px;border-radius:999px;background:rgba(24,24,24,.72);backdrop-filter:blur(16px) saturate(160%);-webkit-backdrop-filter:blur(16px) saturate(160%);border:none;border-top:2px solid #414141;border-bottom:2px solid #414141;display:flex;align-items:center;justify-content:center;box-sizing:border-box;pointer-events:none;}
+.brand-pill {
+    height: 46px; border-radius: 999px;
+    background: rgba(24, 24, 24, 0.2);
+    backdrop-filter: blur(25px) saturate(180%);
+    -webkit-backdrop-filter: blur(25px) saturate(180%);
+    border: none; 
+    border-top: 1px solid rgba(255, 255, 255, 0.15); 
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    display: flex; align-items: center; justify-content: center;
+    box-sizing: border-box; pointer-events: none;
+}
 .brand-text{font-size:19px;font-weight:800;letter-spacing:.5px;color:#fff;pointer-events:none;}
 
-html[data-theme="light"] .circle-btn{background:rgba(24,24,24,.72)}
-html[data-theme="light"] .brand-pill{background:rgba(24,24,24,.72)}
+html[data-theme="light"] .circle-btn{background:rgba(24,24,24,0.2);}
+html[data-theme="light"] .brand-pill{background:rgba(24,24,24,0.2);}
 
 .fab-new-chat{position:fixed;left:18px;bottom:24px;width:54px;height:54px;border-radius:50%;background:#6c6c6e;color:#fff;display:flex;align-items:center;justify-content:center;border:1px solid rgba(255,255,255,.15);z-index:6;transition:transform .15s;touch-action:manipulation;}
 .fab-new-chat:active{transform:scale(.9)}
@@ -134,16 +160,25 @@ html[data-theme="light"] .brand-pill{background:rgba(24,24,24,.72)}
 #screen-chat .hdr.chat-hdr > *{pointer-events:auto;}
 #screen-chat .hdr.chat-hdr .circle-btn{width:46px;height:46px;}
 
-.chat-hdr-center{flex:1;min-width:0;display:flex;align-items:center;gap:10px;padding:5px 10px 5px 14px;background:rgba(24,24,24,.72);backdrop-filter:blur(16px) saturate(160%);-webkit-backdrop-filter:blur(16px) saturate(160%);border-radius:999px;border-top:2px solid #414141;border-bottom:2px solid #414141;height:46px;box-sizing:border-box;cursor:pointer;transition:background .2s;touch-action:manipulation;}
-.chat-hdr-center:hover{background:rgba(31,31,31,.85)}
-.chat-hdr-center:active{background:rgba(37,37,37,.9)}
+.chat-hdr-center {
+    flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; padding: 5px 10px 5px 14px;
+    background: rgba(24, 24, 24, 0.2);
+    backdrop-filter: blur(25px) saturate(180%);
+    -webkit-backdrop-filter: blur(25px) saturate(180%);
+    border-radius: 999px; 
+    border-top: 1px solid rgba(255, 255, 255, 0.15); 
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    height: 46px; box-sizing: border-box; cursor: pointer; transition: background .2s; touch-action: manipulation;
+}
+.chat-hdr-center:hover { background: rgba(24, 24, 24, 0.4); }
+.chat-hdr-center:active { background: rgba(24, 24, 24, 0.6); }
 
 .chat-hdr-avatar{width:34px;height:34px;border-radius:10px;flex-shrink:0;background-size:cover;background-position:center;background-repeat:no-repeat;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#fff;overflow:hidden;}
 .chat-hdr-info{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;text-align:right;}
 .chat-hdr-name{font-size:14px;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center;gap:3px;line-height:1.2;}
 .chat-hdr-name .vf{width:19px;height:19px;flex-shrink:0;}
 .chat-hdr-status{font-size:11px;color:rgba(255,255,255,.55);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:500;line-height:1.2;}
-html[data-theme="light"] .chat-hdr-center{background:rgba(24,24,24,.72)}
+html[data-theme="light"] .chat-hdr-center{background:rgba(24,24,24,0.2);}
 
 /* TAB BODY */
 .tab-body{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;display:flex;flex-direction:column;padding:0 8px 20px;padding-top:calc(var(--hdr-h) + 2px);overscroll-behavior:contain;}
@@ -162,11 +197,23 @@ html[data-theme="light"] .chat-hdr-center{background:rgba(24,24,24,.72)}
 /* TOP NAV */
 .top-nav{display:flex;align-items:center;gap:6px;padding:0 10px;margin:0 0 10px;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;-webkit-overflow-scrolling:touch;flex-shrink:0;background:transparent;border:none;position:relative;z-index:2;touch-action:pan-x;}
 .top-nav::-webkit-scrollbar{display:none}
-.tnav-item{flex-shrink:0;padding:8px 14px;border-radius:999px;font-size:12.5px;font-weight:600;color:rgba(255,255,255,.7);background:rgba(24,24,24,.72);backdrop-filter:blur(16px) saturate(160%);-webkit-backdrop-filter:blur(16px) saturate(160%);border:none;border-top:2px solid #414141;border-bottom:2px solid #414141;white-space:nowrap;cursor:pointer;transition:background .22s ease,color .22s ease,transform .15s ease;letter-spacing:-.1px;line-height:1;box-sizing:border-box;touch-action:manipulation;user-select:none;pointer-events:auto;}
+
+.tnav-item {
+    flex-shrink: 0; padding: 8px 14px; border-radius: 999px;
+    font-size: 12.5px; font-weight: 600; color: rgba(255, 255, 255, 0.8);
+    background: rgba(24, 24, 24, 0.2);
+    backdrop-filter: blur(25px) saturate(180%);
+    -webkit-backdrop-filter: blur(25px) saturate(180%);
+    border: none; 
+    border-top: 1px solid rgba(255, 255, 255, 0.15); 
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    white-space: nowrap; cursor: pointer; transition: background .22s ease, color .22s ease, transform .15s ease;
+    letter-spacing: -.1px; line-height: 1; box-sizing: border-box; touch-action: manipulation; user-select: none; pointer-events: auto;
+}
 .tnav-item:active{transform:scale(.95)}
-.tnav-item.active{color:#fff;background:#6c6c6e;}
-html[data-theme="light"] .tnav-item{background:rgba(24,24,24,.72);color:rgba(255,255,255,.7);}
-html[data-theme="light"] .tnav-item.active{color:#fff;background:#6c6c6e;}
+.tnav-item.active{color:#fff;background:rgba(108,108,110,0.6); border-top-color: rgba(255,255,255,0.3);}
+html[data-theme="light"] .tnav-item{background:rgba(24,24,24,0.2);color:rgba(255,255,255,0.8);}
+html[data-theme="light"] .tnav-item.active{color:#fff;background:rgba(108,108,110,0.6);}
 
 /* CHAT ITEM */
 .chat-item{display:flex;gap:13px;padding:12px 8px;align-items:center;cursor:pointer;transition:background .15s;background:transparent;position:relative;border-bottom:1px solid var(--line);touch-action:manipulation;}
@@ -366,28 +413,59 @@ html[data-theme="light"] .scroll-bottom-btn{background:rgba(255,255,255,.95);col
 .msg-search-bar input:focus{border-color:rgba(108,108,110,.5);background:var(--surface-3);}
 .msg-search-count{font-size:12px;color:var(--text-3);font-weight:600;white-space:nowrap;}
 
-/* COMPOSER */
+/* =========================================
+   COMPOSER (دکمه ها و باکس تایپ با شفافیت ۸۰٪)
+   ========================================= */
 .composer{position:absolute;bottom:0;left:0;right:0;display:flex;align-items:flex-end;gap:8px;padding:10px 12px 12px;background:transparent;border-top:none;z-index:15;}
 
-.composer-voice{width:44px;height:44px;border-radius:50%;background:rgba(108,108,110,.88);backdrop-filter:blur(16px) saturate(160%);-webkit-backdrop-filter:blur(16px) saturate(160%);border:none;border-top:2px solid #414141;border-bottom:2px solid #414141;color:#fff;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:transform .15s,background .2s;box-sizing:border-box;touch-action:manipulation;cursor:pointer;}
+.composer-voice {
+    width: 44px; height: 44px; border-radius: 50%;
+    background: rgba(108, 108, 110, 0.2);
+    backdrop-filter: blur(25px) saturate(180%);
+    -webkit-backdrop-filter: blur(25px) saturate(180%);
+    border: none; 
+    border-top: 1px solid rgba(255, 255, 255, 0.15); 
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    color: #fff; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: transform .15s, background .2s;
+    box-sizing: border-box; touch-action: manipulation; cursor: pointer;
+}
 .composer-voice:active{transform:scale(.9)}
 .composer-voice svg{fill:#fff;pointer-events:none}
 
 .composer-input-area{flex:1;min-width:0;display:flex;flex-direction:column;gap:6px;}
 .composer-mini-actions{display:flex;gap:6px;justify-content:flex-end;padding:0 10px;}
-.composer-mini{width:30px;height:30px;border-radius:50%;background:rgba(24,24,24,.72);backdrop-filter:blur(16px) saturate(160%);-webkit-backdrop-filter:blur(16px) saturate(160%);border:none;border-top:2px solid #414141;border-bottom:2px solid #414141;color:#fff;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:transform .15s,background .2s;box-sizing:border-box;touch-action:manipulation;cursor:pointer;}
-.composer-mini:active{transform:scale(.88);background:rgba(37,37,37,.9)}
+.composer-mini {
+    width: 30px; height: 30px; border-radius: 50%;
+    background: rgba(24, 24, 24, 0.2);
+    backdrop-filter: blur(25px) saturate(180%);
+    -webkit-backdrop-filter: blur(25px) saturate(180%);
+    border: none; 
+    border-top: 1px solid rgba(255, 255, 255, 0.15); 
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    color: #fff; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: transform .15s, background .2s;
+    box-sizing: border-box; touch-action: manipulation; cursor: pointer;
+}
+.composer-mini:active{transform:scale(.88);background:rgba(37,37,37,.8)}
 .composer-mini svg{fill:#fff;pointer-events:none;opacity:.85}
 
-/* باکس پیام بزرگ‌تر */
-.composer-input-wrap{background:rgba(24,24,24,.78);backdrop-filter:blur(16px) saturate(160%);-webkit-backdrop-filter:blur(16px) saturate(160%);border:none;border-top:2px solid #414141;border-bottom:2px solid #414141;border-radius:26px;padding:5px 8px 5px 10px;display:flex;align-items:flex-end;gap:6px;min-height:50px;max-height:126px;box-sizing:border-box;transition:background .2s;}
-.composer-input-wrap:focus-within{background:rgba(31,31,31,.85)}
+/* باکس تایپ پیام */
+.composer-input-wrap {
+    background: rgba(24, 24, 24, 0.2);
+    backdrop-filter: blur(25px) saturate(180%);
+    -webkit-backdrop-filter: blur(25px) saturate(180%);
+    border: none; 
+    border-top: 1px solid rgba(255, 255, 255, 0.15); 
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 26px; padding: 5px 8px 5px 10px; display: flex; align-items: flex-end; gap: 6px;
+    min-height: 50px; max-height: 126px; box-sizing: border-box; transition: background .2s;
+}
+.composer-input-wrap:focus-within{background:rgba(31,31,31,0.4)}
 
 #msg-input{flex:1;min-width:0;border:none;outline:none;background:transparent;resize:none;font-size:15px;line-height:1.4;max-height:100px;overflow-y:auto;padding:6px 0 6px 4px;color:var(--text);font-weight:400;font-family:inherit;}
 #msg-input::placeholder{color:var(--text-3)}
 
 /* دکمه ارسال 40×40 هم‌اندازه باکس */
-.composer-text-send{width:40px;height:40px;border-radius:50%;background:#6c6c6e;border:none;border-top:2px solid #414141;border-bottom:2px solid #414141;color:#fff;display:none;align-items:center;justify-content:center;flex-shrink:0;cursor:pointer;transition:transform .15s,background .2s;box-sizing:border-box;touch-action:manipulation;}
+.composer-text-send{width:40px;height:40px;border-radius:50%;background:#6c6c6e;border:none;border-top:1px solid rgba(255,255,255,0.2);border-bottom:1px solid rgba(255,255,255,0.05);color:#fff;display:none;align-items:center;justify-content:center;flex-shrink:0;cursor:pointer;transition:transform .15s,background .2s;box-sizing:border-box;touch-action:manipulation;}
 .composer-text-send.show{display:flex;}
 .composer-text-send:active{transform:scale(.9);}
 .composer-text-send svg{fill:#fff;pointer-events:none;}
@@ -506,40 +584,94 @@ html[data-theme="light"] .group{background:linear-gradient(135deg,rgba(255,255,2
 .chev{color:var(--text-4);display:flex;align-items:center}
 .chev svg{fill:currentColor;transform:scaleX(-1)}
 
-.profile-card{display:flex;flex-direction:column;align-items:center;gap:16px;padding:36px 20px 30px;background:linear-gradient(135deg,rgba(255,255,255,.05),rgba(255,255,255,.01));border:1px solid var(--line);border-top-color:var(--line-2);border-radius:var(--r-xl);margin:14px 14px 22px;position:relative;overflow:hidden;}
-html[data-theme="light"] .profile-card{background:linear-gradient(135deg,rgba(255,255,255,.95),rgba(255,255,255,.75))}
-.profile-card .avatar{cursor:pointer;transition:transform .15s}
-.profile-card .avatar:active{transform:scale(.94)}
-.profile-card .pn{font-size:22px;font-weight:800;letter-spacing:-.4px;display:flex;align-items:center;gap:7px;}
-.profile-card .pn .vf{width:24px;height:24px}
-.profile-card .pp{font-size:13.5px;color:var(--text-3);margin-top:2px}
-.pc-edit-btn{position:absolute;top:16px;left:16px;padding:7px 14px;border-radius:12px;background:rgba(108,108,110,.14);color:#a0a0a2;font-size:12px;font-weight:700;border:1px solid rgba(108,108,110,.28);display:flex;align-items:center;gap:6px;z-index:5;}
-.pc-edit-btn svg{fill:currentColor;width:14px;height:14px}
-.pc-edit-btn:active{transform:scale(.95);background:rgba(108,108,110,.25)}
-
-/* --- کاور تنظیمات --- */
-.profile-card.has-cover { padding-top: 160px !important; }
-.profile-card .pc-cover {
-  position: absolute !important; top: 0 !important; left: 0 !important; right: 0 !important;
-  width: 100% !important; height: 160px !important;
-  background-size: cover !important; background-repeat: no-repeat !important; background-position: center !important; background-color: var(--surface-2) !important;
-  margin: 0 !important;
-  border-radius: calc(var(--r-xl) - 1px) calc(var(--r-xl) - 1px) 0 0;
-  cursor: pointer; display: flex; align-items: center; justify-content: center;
-  color: var(--text-3); font-size: 13px; gap: 8px; z-index: 1; overflow: hidden;
+/* =========================================
+   پروفایل تنظیمات (مرتب شده با کاور و بدون کاور)
+   ========================================= */
+.profile-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    padding: 160px 20px 30px;
+    background: linear-gradient(135deg, rgba(255,255,255,.05), rgba(255,255,255,.01));
+    border: 1px solid var(--line);
+    border-top-color: var(--line-2);
+    border-radius: var(--r-xl);
+    margin: 14px 14px 22px;
+    position: relative;
+    overflow: hidden;
 }
-.profile-card .pc-cover.empty { background: linear-gradient(135deg, rgba(255,255,255,.04), rgba(255,255,255,.01)); border-bottom: 1px solid var(--line); }
-.profile-card.has-cover .avatar.big { margin-top: -60px !important; border: 4px solid var(--bg); z-index: 2; position: relative; }
+html[data-theme="light"] .profile-card {
+    background: linear-gradient(135deg, rgba(255,255,255,.95), rgba(255,255,255,.75));
+}
 
-/* دکمه ویرایش در تنظیمات وقتی کاور هست، خوانا بشه */
-.profile-card.has-cover .pc-edit-btn {
-  background: rgba(0,0,0,0.7) !important;
-  color: white !important;
-  border: 1px solid rgba(255,255,255,0.2) !important;
-  top: 16px !important;
-  left: 16px !important;
-  z-index: 10 !important;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.3) !important;
+/* باکس کاور (همیشه بالای پروفایل قرار می‌گیره) */
+.profile-card .pc-cover {
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    width: 100%; height: 160px;
+    background-size: cover;
+    background-repeat: no-repeat;
+    background-position: center;
+    background-color: var(--surface-2);
+    border-radius: calc(var(--r-xl) - 1px) calc(var(--r-xl) - 1px) 0 0;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-3);
+    font-size: 13px;
+    gap: 8px;
+    z-index: 1;
+    overflow: hidden;
+}
+.profile-card .pc-cover.empty {
+    background: linear-gradient(135deg, rgba(255,255,255,.04), rgba(255,255,255,.01));
+    border-bottom: 1px solid var(--line);
+}
+
+/* آواتار که 60 پیکسل روی کاور میفته */
+.profile-card .avatar {
+    cursor: pointer;
+    transition: transform .15s;
+    margin-top: -60px;
+    border: 4px solid var(--bg);
+    z-index: 2;
+    position: relative;
+}
+.profile-card .avatar:active { transform: scale(.94); }
+
+.profile-card .pn { font-size:22px; font-weight:800; letter-spacing:-.4px; display:flex; align-items:center; gap:7px; }
+.profile-card .pn .vf { width:24px; height:24px; }
+.profile-card .pp { font-size:13.5px; color:var(--text-3); margin-top:2px; }
+
+/* دکمه ویرایش (شیشه ای و بلورمانند) */
+.pc-edit-btn {
+    position: absolute;
+    top: 16px;
+    left: 16px;
+    padding: 8px 16px;
+    border-radius: 14px;
+    background: rgba(24, 24, 24, 0.2) !important; 
+    backdrop-filter: blur(25px) saturate(180%) !important;
+    -webkit-backdrop-filter: blur(25px) saturate(180%) !important;
+    color: #fff !important;
+    font-size: 12.5px;
+    font-weight: 700;
+    border: 1px solid rgba(255,255,255,0.15) !important;
+    border-bottom: 1px solid rgba(255,255,255,0.05) !important;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    z-index: 10;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important;
+    text-shadow: 0 1px 3px rgba(0,0,0,0.5);
+    transition: all 0.2s ease;
+}
+.pc-edit-btn svg { fill: currentColor; width: 14px; height: 14px; }
+.pc-edit-btn:active { 
+    transform: scale(.95); 
+    background: rgba(24, 24, 24, 0.5) !important; 
 }
 
 /* --- کاور صفحه اطلاعات --- */
