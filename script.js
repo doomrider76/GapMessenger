@@ -204,7 +204,7 @@ function save() {
 function applyTheme() {
   document.documentElement.setAttribute('data-theme', state.theme || 'dark');
   const meta = document.querySelector('meta[name="theme-color"]');
-  if (meta) meta.content = state.theme === 'light' ? '#f2f2f7' : '#131313';
+  if (meta) meta.content = 'transparent'; // <--- شفافیت نوتیفیکیشن سنتر
 }
 applyTheme();
 
