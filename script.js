@@ -1,5 +1,5 @@
 /* =========================================================
-   گپ v1.0.2 — Custom Wallpaper, Spacing Fix & Owner Warn
+   گپ v1.0.3
    ========================================================= */
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
@@ -8,9 +8,9 @@ const escRe = s => String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const rid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 const icon = (n, s = 20) => `<svg width="${s}" height="${s}"><use href="#i-${n}"/></svg>`;
 const KEY = 'pisfon_v3', BACKUP_KEY = 'pisfon_backup_auto', VERSION_KEY = 'pisfon_version';
-const APP_VERSION = '1.0.2';
+const APP_VERSION = '1.0.3';
 
-// --- Helper for Date & Badges ---
+// --- تاریخ عضویت (شمسی) ---
 function getPersianDate(ts = Date.now()) {
   try {
     const parts = new Intl.DateTimeFormat('fa-IR', { month: 'long', year: 'numeric' }).formatToParts(new Date(ts));
@@ -19,20 +19,6 @@ function getPersianDate(ts = Date.now()) {
     return `\u200F${month} ${year}`;
   } catch { return 'نامشخص'; }
 }
-
-const BADGES = {
-  blue: { src: 'blue-tick.png', title: 'نشان افراد سرشناس' },
-  yellow: { src: 'yellow-tick.png', title: 'نشان سازمانی' },
-  green: { src: 'green-tick.png', title: 'نشان تجاری' },
-  personal: { src: 'personal-tick.png', title: 'نشان شخصی' }
-};
-
-const vfHTML = (badgeType, s = 20) => {
-  if (!badgeType || !BADGES[badgeType]) return '';
-  return `<img class="vf" src="${BADGES[badgeType].src}" width="${s}" height="${s}" alt="${BADGES[badgeType].title}" loading="lazy">`;
-};
-
-const nameWithVf = (n, badgeType, s = 20) => `${esc(n)}${vfHTML(badgeType, s)}`;
 
 /* ---------- viewport ---------- */
 const setVP = () => {
@@ -54,11 +40,12 @@ document.addEventListener('contextmenu', e => {
 
 /* ---------- constants ---------- */
 const CHANGELOG = [
-  'رفع باگ های گزارش شده',
   'افزایش سرعت برنامه',
-  'افزوده شدن دکمه برسی اپدیت',
-  'افزوده شدن امکان تنظیم والپیپر چت',
-  'اضافه شدن 3 نشان تایید هویت دیگر'
+  'رفع باگ‌های گزارش‌شده',
+  'رفع مشکلات تم روشن',
+  'قابلیت پین کردن پیام‌ها',
+  'امکان نوشتن متن در قالب‌های مختلف',
+  'امکان ارسال عکس، ویدیو و فایل در حجم بالا'
 ];
 const AV_GRADS = [
   ['#ff6b6b','#c92a2a'],['#51cf66','#2b8a3e'],['#ffd43b','#e67700'],['#4dabf7','#1864ab'],
@@ -115,12 +102,12 @@ const emptyState = () => ({
 
 function normalizeAccount(acc) {
   if (!acc.id) acc.id = 'acc_' + Date.now() + Math.random().toString(36).slice(2, 6);
-  if (acc.verified && !acc.badgeType) acc.badgeType = 'blue';
-  if (!acc.badgeType) acc.badgeType = null;
-  if (!acc.joinedDate) acc.joinedDate = getPersianDate();
   if (!Array.isArray(acc.chats)) acc.chats = [];
   if (!Array.isArray(acc.contacts)) acc.contacts = [];
   if (acc.coverPhoto === undefined) acc.coverPhoto = null;
+  if (acc.verified && !acc.badgeType) acc.badgeType = 'blue';
+  if (!acc.badgeType) acc.badgeType = null;
+  if (!acc.joinedDate) acc.joinedDate = getPersianDate();
   return acc;
 }
 
@@ -129,13 +116,13 @@ function normalizeChat(c, i) {
   if (c.verified && !c.badgeType) c.badgeType = 'blue';
   if (!c.badgeType) c.badgeType = null;
   if (!c.joinedDate) c.joinedDate = getPersianDate(c.createdAt || Date.now());
+  if (c.wallpaper === undefined) c.wallpaper = null;
+  if (c.owner === undefined) c.owner = null;
   if (typeof c.username !== 'string') c.username = '';
   if (typeof c.isPublic !== 'boolean') c.isPublic = c.type === 'channel';
   if (typeof c.draft !== 'string') c.draft = '';
   if (typeof c.description !== 'string') c.description = '';
   if (c.coverPhoto === undefined) c.coverPhoto = null;
-  if (c.wallpaper === undefined) c.wallpaper = null;
-  if (c.owner === undefined) c.owner = null;
   if (!Array.isArray(c.admins)) c.admins = [];
   if (!c.permissions) c.permissions = {sendMessages:'all',editInfo:'all'};
   if (typeof c.joined !== 'boolean') c.joined = true;
@@ -144,8 +131,12 @@ function normalizeChat(c, i) {
   if (c.type === 'group' && Array.isArray(c.membersList) && c.membersList.length > c.members) c.members = c.membersList.length;
   if (c.type === 'group' && !Array.isArray(c.membersList)) c.membersList = [];
   if (typeof c.warner !== 'string') c.warner = '';
+  if (typeof c.commentsEnabled !== 'boolean') c.commentsEnabled = false;
+  if (typeof c.signMessages !== 'boolean') c.signMessages = false;
+  if (typeof c.signSince !== 'number') c.signSince = c.signMessages ? Date.now() : 0;
   c.messages.forEach(m => {
     if (!m.reactions) m.reactions = {};
+    if (!Array.isArray(m.comments)) m.comments = [];
     if (typeof m.deleted !== 'boolean') m.deleted = false;
     if (typeof m.editedForAll !== 'boolean') m.editedForAll = false;
     if (typeof m.seenCount !== 'number') m.seenCount = 0;
@@ -203,10 +194,431 @@ function save() {
 
 function applyTheme() {
   document.documentElement.setAttribute('data-theme', state.theme || 'dark');
-  const meta = document.querySelector('meta[name="theme-color"]');
-  if (meta) meta.content = 'transparent'; // <--- شفافیت نوتیفیکیشن سنتر
+  const isLight = state.theme === 'light';
+  const bgColor = isLight ? '#ffffff' : '#131313';
+  /* theme-color: remove old tags and add a fresh one so the status bar / notification shade updates immediately */
+  document.querySelectorAll('meta[name="theme-color"]').forEach(m => m.remove());
+  const tc = document.createElement('meta');
+  tc.name = 'theme-color'; tc.content = bgColor;
+  document.head.appendChild(tc);
+  const cs = document.querySelector('meta[name="color-scheme"]');
+  if (cs) cs.content = isLight ? 'light' : 'dark';
+  document.documentElement.style.backgroundColor = bgColor;
+  let asb = document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]');
+  if (!asb) { asb = document.createElement('meta'); asb.name = 'apple-mobile-web-app-status-bar-style'; document.head.appendChild(asb); }
+  asb.content = isLight ? 'default' : 'black';
+  if (document.body) document.body.style.backgroundColor = bgColor;
+  try { if (typeof activeChatId !== 'undefined' && activeChatId) applyWallpaper(getChat(activeChatId)); } catch {}
 }
 applyTheme();
+
+/* ---------- media store (IndexedDB) — ذخیره‌ی واقعی عکس/ویدیو/ویس/فایل ---------- */
+const MEDIA_DB = 'gap_media', MEDIA_STORE = 'blobs';
+let _mdb = null, _persistAsked = false;
+const mediaSessionIds = new Set();
+function mediaDB() {
+  if (_mdb) return _mdb;
+  _mdb = new Promise((res, rej) => {
+    try {
+      if (!window.indexedDB) throw new Error('no-idb');
+      const rq = indexedDB.open(MEDIA_DB, 1);
+      rq.onupgradeneeded = () => { if (!rq.result.objectStoreNames.contains(MEDIA_STORE)) rq.result.createObjectStore(MEDIA_STORE); };
+      rq.onsuccess = () => res(rq.result);
+      rq.onerror = () => rej(rq.error || new Error('idb'));
+      rq.onblocked = () => rej(new Error('idb-blocked'));
+    } catch (e) { rej(e); }
+  });
+  _mdb.catch(() => { _mdb = null; });
+  return _mdb;
+}
+function idbTx(mode, fn) {
+  return mediaDB().then(db => new Promise((res, rej) => {
+    const tx = db.transaction(MEDIA_STORE, mode);
+    let out;
+    try { out = fn(tx.objectStore(MEDIA_STORE)); } catch (e) { rej(e); return; }
+    tx.oncomplete = () => res(out && 'result' in out ? out.result : undefined);
+    tx.onerror = () => rej(tx.error);
+    tx.onabort = () => rej(tx.error || new Error('abort'));
+  }));
+}
+async function mediaPut(blob) {
+  if (!_persistAsked) { _persistAsked = true; try { navigator.storage && navigator.storage.persist && navigator.storage.persist(); } catch {} }
+  const id = 'md_' + rid();
+  await idbTx('readwrite', s => s.put(blob, id));
+  mediaSessionIds.add(id);
+  return id;
+}
+const mediaGet = id => idbTx('readonly', s => s.get(id));
+const mediaAllKeys = () => idbTx('readonly', s => s.getAllKeys());
+const mediaDelete = ids => idbTx('readwrite', s => { ids.forEach(k => s.delete(k)); });
+
+const mediaUrls = new Map(), mediaPending = new Map();
+const mediaUrlSync = id => (id && mediaUrls.get(id)) || '';
+function mediaUrl(id) {
+  if (!id) return Promise.resolve('');
+  if (mediaUrls.has(id)) return Promise.resolve(mediaUrls.get(id));
+  if (mediaPending.has(id)) return mediaPending.get(id);
+  const p = mediaGet(id)
+    .then(b => { if (!b) return ''; const u = URL.createObjectURL(b); mediaUrls.set(id, u); return u; })
+    .catch(() => '')
+    .then(u => { mediaPending.delete(id); return u; });
+  mediaPending.set(id, p);
+  return p;
+}
+
+/* فایل‌هایی که دیگه هیچ پیامی بهشون اشاره نمی‌کنه از حافظه پاک می‌شن */
+function collectMediaIds() {
+  const ids = new Set();
+  const scan = chats => (chats || []).forEach(c => (c.messages || []).forEach(m => {
+    if (m.mediaId) ids.add(m.mediaId);
+    if (m.thumbId) ids.add(m.thumbId);
+    (m.items || []).forEach(it => { if (it.mediaId) ids.add(it.mediaId); if (it.thumbId) ids.add(it.thumbId); });
+  }));
+  scan(state.me && state.me.chats);
+  (state.accounts || []).forEach(a => scan(a.chats));
+  scan(state._globalDirectory);
+  return ids;
+}
+async function gcMedia() {
+  const keys = await mediaAllKeys();
+  const used = collectMediaIds();
+  const dead = keys.filter(k => !used.has(k) && !mediaSessionIds.has(k));
+  if (dead.length) await mediaDelete(dead);
+}
+async function wipeMedia() {
+  try { if (_mdb) { const db = await _mdb; db.close(); } } catch {}
+  _mdb = null; mediaUrls.clear(); mediaPending.clear();
+  try { indexedDB.deleteDatabase(MEDIA_DB); } catch {}
+}
+function findMedia(chat, id) {
+  if (!chat) return null;
+  const sid = String(id), k = sid.indexOf('~');
+  if (k < 0) return chat.messages.find(x => x.id === sid) || null;
+  const m = chat.messages.find(x => x.id === sid.slice(0, k));
+  return (m && m.items && m.items[+sid.slice(k + 1)]) || null;
+}
+const mediaFields = m => ({ items: m.items ? m.items.map(x => Object.assign({}, x)) : undefined, mediaId: m.mediaId || null, thumbId: m.thumbId || null, mime: m.mime || null, fname: m.fname || null, w: m.w || null, h: m.h || null, caption: m.caption || '' });
+
+/* ---------- پخش‌کننده‌های ویدیو/صوت داخل پیام (بین رندرها زنده می‌مونن) ---------- */
+const mediaEls = new Map();      // msgId -> <video>/<audio>
+let mediaDeferred = false;
+function pauseAllMedia(except) { mediaEls.forEach(el => { if (el !== except && !el.paused) { try { el.pause(); } catch {} } }); }
+function resetMediaEls() { mediaEls.forEach(el => { try { el.pause(); } catch {} }); mediaEls.clear(); mediaDeferred = false; }
+
+function mountMediaEl(slot) {
+  const id = slot.dataset.slot, kind = slot.dataset.kind;
+  let el = mediaEls.get(id);
+  if (!el) {
+    const chat = getChat(activeChatId);
+    const m = findMedia(chat, id);
+    if (!m || !m.mediaId) return;
+    el = document.createElement(kind === 'audio' ? 'audio' : 'video');
+    el.controls = true;
+    el.preload = 'metadata';
+    if (kind === 'video') { el.playsInline = true; el.setAttribute('playsinline', ''); el.setAttribute('webkit-playsinline', ''); }
+    el.addEventListener('error', () => toast('این فایل توسط مرورگر پخش نمی‌شود؛ از منوی پیام ذخیره‌اش کن', 'error'));
+    mediaEls.set(id, el);
+    if (kind === 'video' && m.thumbId) mediaUrl(m.thumbId).then(u => { if (u) el.poster = u; });
+    mediaUrl(m.mediaId).then(u => { if (u) el.src = u; });
+  }
+  if (!slot.contains(el)) slot.appendChild(el);
+}
+
+/* اگه یه ویدیو/صوت داره پخش می‌شه، حبابش رو دست نمی‌زنیم تا پخش قطع نشه */
+function patchMessages(box, html) {
+  const playing = [];
+  mediaEls.forEach((el, id) => { if (!el.paused && !el.ended && el.isConnected && box.contains(el)) playing.push(id); });
+  const midOf = id => String(id).split('~')[0];
+  if (!playing.length) { box.innerHTML = html; return; }
+  const tpl = document.createElement('template');
+  tpl.innerHTML = html;
+  const kids = [...tpl.content.children];
+  const idOf = n => { const e = n.matches && n.matches('.msg[data-id]') ? n : n.querySelector && n.querySelector('.msg[data-id]'); return e ? e.dataset.id : null; };
+  const keep = new Map();
+  playing.forEach(id => {
+    const old = mediaEls.get(id).closest('.msg-group-row') || mediaEls.get(id).closest('.msg');
+    if (old && old.parentNode === box && kids.some(k => idOf(k) === midOf(id))) keep.set(midOf(id), old);
+  });
+  if (!keep.size) { box.innerHTML = html; return; }
+  const keptNodes = new Set(keep.values());
+  [...box.children].forEach(ch => { if (!keptNodes.has(ch)) ch.remove(); });
+  let ref = null;
+  for (let i = kids.length - 1; i >= 0; i--) {
+    const id = idOf(kids[i]);
+    if (id && keep.has(id)) ref = keep.get(id);
+    else box.insertBefore(kids[i], ref);
+  }
+  mediaDeferred = true;
+}
+
+function afterRender(box) {
+  box.querySelectorAll('img[data-mid]').forEach(img => {
+    if (img.getAttribute('src')) return;
+    mediaUrl(img.dataset.mid).then(u => { if (u) img.src = u; });
+  });
+  const live = new Set();
+  box.querySelectorAll('[data-slot]').forEach(slot => { live.add(slot.dataset.slot); mountMediaEl(slot); });
+  mediaEls.forEach((el, id) => { if (!live.has(id)) { try { el.pause(); } catch {} mediaEls.delete(id); } });
+  syncVoiceUI();
+}
+
+/* ---------- ارسال فایل واقعی ---------- */
+function fileKind(f) {
+  const t = (f.type || '').toLowerCase(), n = (f.name || '').toLowerCase();
+  if (t.startsWith('image/') || /\.(jpe?g|png|gif|webp|bmp|avif|svg)$/.test(n)) return 'image';
+  if (t.startsWith('video/') || /\.(mp4|m4v|mov|webm|ogv)$/.test(n)) return 'video';
+  if (t.startsWith('audio/') || /\.(mp3|m4a|aac|wav|ogg|oga|opus|flac)$/.test(n)) return 'audio';
+  return 'file';
+}
+function checkCanSend(chat) {
+  if (!chat) return false;
+  if (isWarnerChat(chat)) { toast('امکان ارسال پیام به این کاربر وجود ندارد', 'error'); return false; }
+  if (chat.permissions && chat.permissions.sendMessages === 'admins' && (chat.type === 'group' || chat.type === 'channel')
+      && !(chat.admins || []).includes(state.me.name)) { toast('فقط مدیران می‌توانند پیام بفرستند', 'error'); return false; }
+  return true;
+}
+async function prepareImage(file) {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => rej(new Error('decode')); i.src = url; });
+    const w = img.naturalWidth, h = img.naturalHeight;
+    if (!w || !h) throw new Error('decode');
+    let thumb = null;
+    const keepOriginal = /gif|svg/.test(file.type || '');
+    if (!keepOriginal && (Math.max(w, h) > 1280 || file.size > 700 * 1024)) {
+      const ratio = Math.min(1280 / w, 1280 / h, 1);
+      const cv = document.createElement('canvas');
+      cv.width = Math.max(1, Math.round(w * ratio)); cv.height = Math.max(1, Math.round(h * ratio));
+      const ctx = cv.getContext('2d');
+      const outType = file.type === 'image/png' ? 'image/png' : 'image/jpeg';
+      if (outType === 'image/jpeg') { ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, cv.width, cv.height); }
+      ctx.drawImage(img, 0, 0, cv.width, cv.height);
+      thumb = await new Promise(r => cv.toBlob(r, outType, 0.84));
+    }
+    return { w, h, thumb };
+  } finally { URL.revokeObjectURL(url); }
+}
+function probeVideo(file) {
+  return new Promise(resolve => {
+    const url = URL.createObjectURL(file);
+    const v = document.createElement('video');
+    v.preload = 'metadata'; v.muted = true; v.playsInline = true;
+    let info = null, done = false;
+    const finish = r => {
+      if (done) return; done = true; clearTimeout(timer);
+      URL.revokeObjectURL(url); try { v.removeAttribute('src'); v.load(); } catch {}
+      resolve(r);
+    };
+    const timer = setTimeout(() => finish(info ? Object.assign(info, { poster: null }) : null), 8000);
+    v.onerror = () => finish(null);
+    v.onloadedmetadata = () => {
+      if (!v.videoWidth || !v.videoHeight) { finish(null); return; }
+      info = { w: v.videoWidth, h: v.videoHeight, dur: isFinite(v.duration) ? v.duration : 0 };
+      v.onseeked = () => {
+        try {
+          const ratio = Math.min(640 / info.w, 640 / info.h, 1);
+          const cv = document.createElement('canvas');
+          cv.width = Math.max(1, Math.round(info.w * ratio)); cv.height = Math.max(1, Math.round(info.h * ratio));
+          cv.getContext('2d').drawImage(v, 0, 0, cv.width, cv.height);
+          cv.toBlob(b => finish(Object.assign(info, { poster: b })), 'image/jpeg', 0.8);
+        } catch { finish(Object.assign(info, { poster: null })); }
+      };
+      try { v.currentTime = Math.min(0.1, (info.dur || 0.2) / 2); } catch { finish(Object.assign(info, { poster: null })); }
+    };
+    v.src = url;
+  });
+}
+function probeAudio(file) {
+  return new Promise(resolve => {
+    const url = URL.createObjectURL(file);
+    const a = new Audio();
+    a.preload = 'metadata';
+    let done = false;
+    const finish = r => { if (done) return; done = true; clearTimeout(timer); URL.revokeObjectURL(url); resolve(r); };
+    const timer = setTimeout(() => finish(0), 6000);
+    a.onerror = () => finish(null);
+    a.onloadedmetadata = () => finish(isFinite(a.duration) ? a.duration : 0);
+    a.src = url;
+  });
+}
+async function sendOneFile(f, chatId, caption) {
+  if (!f.size) { toast('«' + (f.name || 'فایل') + '» خالی است', 'error'); return; }
+  const base = { size: fmtBytes(f.size), mime: f.type || 'application/octet-stream', fname: f.name || '', caption: caption || '' };
+  let kind = fileKind(f);
+  if (kind === 'image') {
+    let info = null;
+    try { info = await prepareImage(f); } catch {}
+    if (info) {
+      const mediaId = await mediaPut(f);
+      const thumbId = info.thumb ? await mediaPut(info.thumb) : mediaId;
+      sendMessage(Object.assign({ type: 'photo', text: '', mediaId, thumbId, w: info.w, h: info.h }, base), '', chatId);
+      return;
+    }
+    kind = 'file';
+  }
+  if (kind === 'video') {
+    const info = await probeVideo(f);
+    if (info) {
+      const mediaId = await mediaPut(f);
+      const thumbId = info.poster ? await mediaPut(info.poster) : null;
+      sendMessage(Object.assign({ type: 'video', text: '', mediaId, thumbId, w: info.w, h: info.h, dur: Math.round(info.dur * 10) / 10 }, base), '', chatId);
+      return;
+    }
+    kind = 'file';
+  }
+  if (kind === 'audio') {
+    const dur = await probeAudio(f);
+    if (dur !== null) {
+      const mediaId = await mediaPut(f);
+      sendMessage(Object.assign({ type: 'audio', text: '', mediaId, dur: Math.round(dur * 10) / 10 }, base), '', chatId);
+      return;
+    }
+  }
+  const mediaId = await mediaPut(f);
+  sendMessage(Object.assign({ type: 'file', text: f.name || 'file', mediaId }, base), '', chatId);
+}
+async function buildItem(f) {
+  if (!f.size) { toast('«' + (f.name || 'فایل') + '» خالی است', 'error'); return null; }
+  const base = { size: fmtBytes(f.size), mime: f.type || 'application/octet-stream', fname: f.name || '' };
+  let kind = fileKind(f);
+  if (kind === 'image') {
+    let info = null;
+    try { info = await prepareImage(f); } catch {}
+    if (info) {
+      const mediaId = await mediaPut(f);
+      const thumbId = info.thumb ? await mediaPut(info.thumb) : mediaId;
+      return Object.assign({ type: 'photo', mediaId, thumbId, w: info.w, h: info.h }, base);
+    }
+    kind = 'file';
+  }
+  if (kind === 'video') {
+    const info = await probeVideo(f);
+    if (info) {
+      const mediaId = await mediaPut(f);
+      const thumbId = info.poster ? await mediaPut(info.poster) : null;
+      return Object.assign({ type: 'video', mediaId, thumbId, w: info.w, h: info.h, dur: Math.round(info.dur * 10) / 10 }, base);
+    }
+    kind = 'file';
+  }
+  if (kind === 'audio') {
+    const dur = await probeAudio(f);
+    if (dur !== null) { const mediaId = await mediaPut(f); return Object.assign({ type: 'audio', mediaId, dur: Math.round(dur * 10) / 10 }, base); }
+  }
+  const mediaId = await mediaPut(f);
+  return Object.assign({ type: 'file', text: f.name || 'file', mediaId }, base);
+}
+async function sendPickedFiles(files, chatId, caption) {
+  const chat = getChat(chatId);
+  if (!checkCanSend(chat)) return;
+  const list = [...files];
+  if (list.length > 10) { toast('حداکثر ۱۰ فایل در هر بار', 'error'); list.length = 10; }
+  const big = list.some(f => f.size > 20 * 1048576);
+  if (big) toast('در حال ذخیره‌ی فایل…', 'info');
+  const cap = caption || '';
+  if (list.length === 1) {
+    try { await sendOneFile(list[0], chatId, cap); }
+    catch (e) { console.error(e); toast('ارسال «' + (list[0].name || 'فایل') + '» ناموفق بود (حافظه‌ی مرورگر پر است؟)', 'error'); }
+    return;
+  }
+  const items = [];
+  for (const f of list) {
+    try { const it = await buildItem(f); if (it) items.push(it); }
+    catch (e) { console.error(e); toast('ذخیره‌ی «' + (f.name || 'فایل') + '» ناموفق بود (حافظه‌ی مرورگر پر است؟)', 'error'); }
+  }
+  if (!items.length) return;
+  if (items.length === 1) sendMessage(Object.assign({ text: '' }, items[0], { caption: cap }), '', chatId);
+  else sendMessage({ type: 'album', items, caption: cap }, '', chatId);
+}
+function pickMedia(accept) {
+  const chat = getChat(activeChatId);
+  if (!checkCanSend(chat)) return;
+  const chatId = chat.id;
+  const inp = document.createElement('input');
+  inp.type = 'file'; inp.multiple = true;
+  if (accept) inp.accept = accept;
+  inp.style.display = 'none';
+  document.body.appendChild(inp);
+  const cleanup = () => setTimeout(() => inp.remove(), 1500);
+  inp.onchange = () => { const files = [...inp.files]; cleanup(); if (files.length) stageFiles(files, chatId); };
+  inp.oncancel = cleanup;
+  inp.click();
+}
+/* ---------- فایل‌های آماده‌ی ارسال: کپشن در همان کادر تایپ نوشته می‌شود ---------- */
+let pendingFiles = [], pendingChatId = null, pendingUrls = [];
+function layoutAttachBar() {}
+function renderAttachBar() {
+  const ab = $('#attach-bar'); if (!ab) return;
+  pendingUrls.forEach(u => URL.revokeObjectURL(u)); pendingUrls = [];
+  if (!pendingFiles.length) { ab.classList.remove('show'); ab.innerHTML = ''; if (inputEl) inputEl.placeholder = 'پیام'; updateSendBtnState(); return; }
+  const shown = pendingFiles.slice(0, 3);
+  ab.innerHTML = shown.map(f => {
+    const k = fileKind(f);
+    const i = pendingFiles.indexOf(f);
+    if (k === 'image') { const u = URL.createObjectURL(f); pendingUrls.push(u); return `<div class="ab-th" data-ab-rm="${i}"><img src="${u}" alt="" draggable="false"></div>`; }
+    return `<div class="ab-th file" data-ab-rm="${i}"><span>${k === 'video' ? '🎬' : k === 'audio' ? '🎵' : '📎'}</span></div>`;
+  }).join('') + (pendingFiles.length > 3 ? `<div class="ab-th more" data-ab-rm="${pendingFiles.length - 1}">+${(pendingFiles.length - 3).toLocaleString('fa-IR')}</div>` : '');
+  ab.classList.add('show');
+  if (inputEl) inputEl.placeholder = 'کپشن…';
+  updateSendBtnState();
+}
+(function () {
+  const ab = $('#attach-bar');
+  if (ab) ab.addEventListener('click', e => {
+    const t = e.target.closest('[data-ab-rm]'); if (!t) return;
+    e.preventDefault(); e.stopPropagation();
+    pendingFiles.splice(+t.dataset.abRm, 1);
+    if (!pendingFiles.length) pendingChatId = null;
+    renderAttachBar();
+    if (inputEl) inputEl.focus();
+  });
+})();
+function clearPending() { pendingFiles = []; pendingChatId = null; renderAttachBar(); }
+function stageFiles(files, chatId) {
+  if (pendingChatId && pendingChatId !== chatId) pendingFiles = [];
+  pendingChatId = chatId;
+  pendingFiles = pendingFiles.concat(files).slice(0, 10);
+  if (pendingFiles.length >= 10 && files.length) toast('حداکثر ۱۰ فایل در هر بار', 'info');
+  renderAttachBar();
+  if (inputEl) inputEl.focus();
+}
+function submitComposer() {
+  if (!pendingFiles.length) { if (inputEl && inputEl.value.trim()) sendMessage(); return; }
+  const chat = getChat(pendingChatId);
+  if (!checkCanSend(chat)) return;
+  const files = pendingFiles, chatId = pendingChatId;
+  const caption = inputEl ? inputEl.value.trim().slice(0, 1024) : '';
+  if (inputEl) { inputEl.value = ''; autoGrow(); }
+  if (chat) chat.draft = '';
+  pendingFiles = []; pendingChatId = null; renderAttachBar();
+  sendPickedFiles(files, chatId, caption);
+  if (activeChatId === chatId) { replyToMsg = null; hideReplyBar(); }
+  save();
+}
+async function downloadMedia(m) {
+  try {
+    const blob = await mediaGet(m.mediaId);
+    if (!blob) { toast('فایل پیدا نشد', 'error'); return; }
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = m.fname || m.text || 'file';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 30000);
+    toast('ذخیره‌ی فایل شروع شد', 'success');
+  } catch { toast('ذخیره‌ی فایل ممکن نشد', 'error'); }
+}
+
+/* نمایش تمام‌صفحه‌ی عکس */
+function openViewer(m, viewId) {
+  const ov = $('#viewer-overlay');
+  if (!ov) return;
+  ov.innerHTML = `<button class="vw-btn vw-close" aria-label="بستن">${icon('close', 22)}</button><button class="vw-btn vw-dl" aria-label="ذخیره">${icon('arrow-down', 22)}</button><img alt="" draggable="false">`;
+  const img = ov.querySelector('img');
+  img.src = mediaUrlSync(m.thumbId || m.mediaId) || '';
+  mediaUrl(m.mediaId).then(u => { if (u) img.src = u; });
+  ov.dataset.msg = viewId || m.id;
+  ov.classList.add('show');
+}
+function closeViewer() { const ov = $('#viewer-overlay'); if (ov) { ov.classList.remove('show'); setTimeout(() => { if (!ov.classList.contains('show')) ov.innerHTML = ''; }, 250); } }
 
 /* ---------- helpers ---------- */
 function nameColors(name) {
@@ -254,6 +666,25 @@ function avatarContent(e) {
   if (av.type === 'image') return '';
   return esc(initials(e.name));
 }
+const BADGES = {
+  blue: { src: 'blue-tick.png', title: 'نشان افراد سرشناس' },
+  yellow: { src: 'yellow-tick.png', title: 'نشان سازمانی' },
+  green: { src: 'green-tick.png', title: 'نشان تجاری' },
+  personal: { src: 'personal-tick.png', title: 'نشان شخصی' }
+};
+const vfHTML = (badgeType, s = 20) => {
+  if (!badgeType || !BADGES[badgeType]) return '';
+  return `<img class="vf" src="${BADGES[badgeType].src}" width="${s}" height="${s}" alt="${BADGES[badgeType].title}" loading="lazy">`;
+};
+const nameWithVf = (n, badgeType, s = 20) => `${esc(n)}${vfHTML(badgeType, s)}`;
+const badgeSheetHTML = () => `
+  <div class="sheet-title">انتخاب نشان تایید</div>
+  <div class="sheet-item" data-badge="none">${icon('ban')}بدون نشان</div>
+  <div class="sheet-item" data-badge="blue">${vfHTML('blue', 20)} نشان افراد سرشناس</div>
+  <div class="sheet-item" data-badge="yellow">${vfHTML('yellow', 20)} نشان سازمانی</div>
+  <div class="sheet-item" data-badge="green">${vfHTML('green', 20)} نشان تجاری</div>
+  <div class="sheet-item" data-badge="personal">${vfHTML('personal', 20)} نشان شخصی</div>
+`;
 
 function renderTopProfile() {
   const el = $('#top-profile-avatar');
@@ -335,10 +766,15 @@ function previewText(c) {
   if (m.deleted) t = '🚫 پیام حذف شد';
   else if (m.type === 'voice') t = '🎤 پیام صوتی';
   else if (m.type === 'photo') t = '🖼 عکس';
-  else if (m.type === 'file') t = '📎 فایل';
+  else if (m.type === 'album') t = '📎 ' + (m.items || []).length.toLocaleString('fa-IR') + ' فایل';
+  else if (m.type === 'video') t = '🎬 ویدیو';
+  else if (m.type === 'audio') t = '🎵 ' + (m.fname || 'فایل صوتی');
+  else if (m.type === 'file') t = '📎 ' + (m.text || 'فایل');
   else if (m.type === 'poll') t = '📊 نظرسنجی';
   else if (m.type === 'location') t = '📍 موقعیت';
-  else t = m.text;
+  else if (m.type === 'warning') t = '⚠️ اخطار سیستمی';
+  else t = stripFmt(m.text);
+  if (m.caption && !m.deleted && ['photo','video','audio','file','album'].includes(m.type)) t += ' ' + String(m.caption).replace(/\s+/g, ' ');
   if (c.type === 'group' && !m.out && m.sender) t = m.sender + ': ' + t;
   else if (m.out) t = 'شما: ' + t;
   return t;
@@ -379,12 +815,31 @@ function buildLinkPreview(url) {
   const domain = domainOf(url);
   return domain ? {url, domain, favicon:`https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=64`} : null;
 }
-function renderRichText(text) {
+function stripFmt(t) {
+  return String(t || '').replace(/^> ?/gm, '').replace(/\*\*([^\n]+?)\*\*/g, '$1').replace(/__([^\n]+?)__/g, '$1').replace(/~~([^\n]+?)~~/g, '$1').replace(/`([^\n`]+)`/g, '$1');
+}
+function renderRichText(text, qColor) {
   if (!text) return '';
-  let out = esc(text);
-  out = out.replace(URL_RE, m => `<a href="${m}" target="_blank" rel="noopener" style="color:#6c6c6e;text-decoration:underline">${m}</a>`);
-  out = out.replace(MENTION_RE, (f, n) => `<a class="mention-link" data-mention="${esc(n)}">@${esc(n)}</a>`);
-  return out;
+  const inline = str => {
+    let out = str;
+    out = out.replace(/`([^`\n]+)`/g, '<code class="mc">$1</code>');
+    out = out.replace(/\*\*([^\n*][^\n]*?)\*\*/g, '<b>$1</b>');
+    out = out.replace(/__([^\n_][^\n]*?)__/g, '<i>$1</i>');
+    out = out.replace(/~~([^\n~][^\n]*?)~~/g, '<s>$1</s>');
+    out = out.replace(URL_RE, m => `<a href="${m}" target="_blank" rel="noopener" style="color:#6c6c6e;text-decoration:underline">${m}</a>`);
+    out = out.replace(MENTION_RE, (f, n) => `<a class="mention-link" data-mention="${esc(n)}">@${esc(n)}</a>`);
+    return out;
+  };
+  const blocks = [];
+  esc(text).split('\n').forEach(ln => {
+    const q = /^&gt; ?/.test(ln);
+    const body = q ? ln.replace(/^&gt; ?/, '') : ln;
+    const last = blocks[blocks.length - 1];
+    if (last && last.q === q) last.lines.push(body); else blocks.push({ q, lines: [body] });
+  });
+  return blocks.map(b => b.q
+    ? `<blockquote class="mq"${qColor ? ` style="--qc:${esc(qColor)}"` : ''}>${inline(b.lines.join('\n'))}</blockquote>`
+    : inline(b.lines.join('\n'))).join('');
 }
 function firstMention(text) {
   if (!text) return null;
@@ -435,6 +890,7 @@ function syncMessageToTargetAccount(targetUsername, messageData, senderInfo) {
     targetAcc.chats.push(targetChat);
   } else {
     targetChat.unread = (targetChat.unread || 0) + 1;
+    targetChat.badgeType = senderInfo.badgeType || null;
   }
   targetChat.messages.push(Object.assign({}, messageData, { out: false, status: 'read' }));
   save();
@@ -463,9 +919,66 @@ function findOrCreatePrivateChatWithEntity(account, entity) {
       createdAt: Date.now(),
       joined: true
     };
+    normalizeChat(chat, account.chats.length);
     account.chats.push(chat);
   }
   return chat;
+}
+
+/* پیدا کردن اکانت محلی (اکانت فعلی یا یکی از اکانت‌های دیگر) از روی آیدی/نام */
+function findLocalAccount(ref) {
+  if (!ref) return null;
+  const all = [state.me, ...(state.accounts || [])];
+  if (ref.username) return all.find(a => a.username && normUser(a.username) === normUser(ref.username)) || null;
+  return all.find(a => !a.username && a.name === ref.name) || null;
+}
+function sameIdentity(a, b) {
+  if (!a || !b) return false;
+  if (a.username && b.username) return normUser(a.username) === normUser(b.username);
+  if (a.username || b.username) return false;
+  return a.name === b.name;
+}
+
+/* ✅ همگام‌سازی نشان تایید بین همه‌ی اکانت‌ها: هر نشانی که برای یک فرد/چت/اکانت ثبت شود، در همه‌ی اکانت‌ها نمایش داده می‌شود */
+function setBadgeEverywhere(entity, badgeType) {
+  if (!entity) return;
+  const bt = badgeType || null;
+  const isGCt = t => t === 'group' || t === 'channel';
+  const kind = e => (e && isGCt(e.type)) ? 'gc' : 'user';
+  const ref = { name: entity.name, username: entity.username || '' };
+  const refKind = kind(entity);
+  const match = e => e && sameIdentity(e, ref) && kind(e) === refKind;
+  entity.badgeType = bt;
+  const all = [state.me, ...(state.accounts || [])];
+  all.forEach(acc => {
+    if (refKind === 'user' && sameIdentity(acc, ref)) acc.badgeType = bt;
+    (acc.chats || []).forEach(c => { if (c.type !== 'saved' && c.type !== 'ai' && match(c)) c.badgeType = bt; });
+    (acc.contacts || []).forEach(c => { if (match(c)) c.badgeType = bt; });
+  });
+  (state._globalDirectory || []).forEach(d => { if (match(d)) d.badgeType = bt; });
+  if (state.globalWarner && refKind === 'user' && sameIdentity(state.globalWarner, ref)) state.globalWarner.badgeType = bt;
+}
+
+/* ✅ منبع حقیقیِ نشانِ هر کاربر، خودِ اکانتِ اوست. این تابع نشانِ همه‌ی چت‌ها/مخاطبین/دایرکتوری‌ها را در همه‌ی اکانت‌ها با نشانِ اکانتِ واقعی یکی می‌کند
+   (چتی که بعداً ساخته شده یا نسخه‌ی قدیمی داشته باشد هم درست می‌شود) */
+function syncBadgesFromAccounts() {
+  const all = [state.me, ...(state.accounts || [])].filter(Boolean);
+  const accFor = e => {
+    if (!e) return null;
+    if (e.username) return all.find(a => a.username && normUser(a.username) === normUser(e.username)) || null;
+    return all.find(a => !a.username && a.name === e.name) || null;
+  };
+  const fix = e => {
+    if (!e || e.type === 'saved' || e.type === 'ai' || e.type === 'group' || e.type === 'channel') return;
+    const a = accFor(e);
+    if (a && (a.badgeType || null) !== (e.badgeType || null)) e.badgeType = a.badgeType || null;
+  };
+  all.forEach(acc => {
+    (acc.chats || []).forEach(fix);
+    (acc.contacts || []).forEach(fix);
+  });
+  (state._globalDirectory || []).forEach(fix);
+  if (state.globalWarner) fix(state.globalWarner);
 }
 
 function isWarnerChat(chat) {
@@ -479,6 +992,7 @@ let chatFilter = 'all';
 let searchDebounce;
 
 function renderChatList() {
+  syncBadgesFromAccounts();
   const q = ($('#search-input')?.value || '').trim();
   const ql = q.toLowerCase();
   const box = $('#chat-list');
@@ -562,6 +1076,7 @@ function renderChatList() {
 }
 
 function renderContacts() {
+  syncBadgesFromAccounts();
   const box = $('#contacts-list');
   if (!box) return;
   if (!state.contacts.length) {
@@ -591,9 +1106,9 @@ function renderSettings() {
       </div>
       <button class="pc-edit-btn" id="btn-edit-profile">${icon('edit',14)} ویرایش</button>
       <div class="avatar big" id="my-avatar-btn" style="${avatarBgStyle(me)}">${avatarContent(me)}</div>
-      <div style="text-align:center">
+      <div class="pc-info">
         <div class="pn">${nameWithVf(me.name, me.badgeType, 26)}</div>
-        <div class="pp" dir="ltr" style="text-align:center">${me.phone ? esc(me.phone) : 'شماره ثبت نشده'}</div>
+        <div class="pp" dir="ltr">${me.phone ? esc(me.phone) : 'شماره ثبت نشده'}</div>
         ${me.username ? `<div class="info-username" style="margin-top:8px">@${esc(me.username)}</div>` : ''}
       </div>
     </div>
@@ -603,7 +1118,7 @@ function renderSettings() {
       <div class="row" data-act="edit-username"><span class="r-icon" style="background:linear-gradient(180deg,#a78bfa,#8b5cf6)">${icon('user',20)}</span><span class="r-text">آیدی من</span><span class="r-val">${me.username ? '@'+esc(me.username) : 'تنظیم نشده'}</span><span class="chev">${icon('chevron',18)}</span></div>
       <div class="row" data-act="edit-phone"><span class="r-icon">${icon('phone',20)}</span><span class="r-text">شماره تلفن</span><span class="r-val" dir="ltr">${me.phone ? esc(me.phone) : '—'}</span><span class="chev">${icon('chevron',18)}</span></div>
       <div class="row" data-act="set-badge"><span class="r-icon" style="background:#6c6c6e">${icon('verified',20)}</span><span class="r-text">نشان تایید</span><span class="r-val">${me.badgeType ? BADGES[me.badgeType].title : 'بدون نشان'}</span><span class="chev">${icon('chevron',18)}</span></div>
-      <div class="row" data-act="edit-joined"><span class="r-icon">${icon('chart',20)}</span><span class="r-text">تاریخ عضویت</span><span class="r-val">${esc(me.joinedDate || getPersianDate())}</span></div>
+      <div class="row" data-act="edit-joined"><span class="r-icon">${icon('chart',20)}</span><span class="r-text">تاریخ عضویت</span><span class="r-val">${esc(me.joinedDate || getPersianDate())}</span><span class="chev">${icon('chevron',18)}</span></div>
     </div>
     <div class="section-title">مدیریت اکانت‌ها</div>
     <div class="group" style="padding: 14px;">
@@ -717,7 +1232,10 @@ $('#btn-save-new-acc').addEventListener('click', () => {
   const newAcc = emptyAccount();
   newAcc.name = name;
   newAcc.username = username;
-  newAcc.joinedDate = getPersianDate();
+  if (username) {
+    const known = [state.me, ...state.accounts].flatMap(a => a.chats || []).find(c => c.username && normUser(c.username) === normUser(username) && c.badgeType);
+    if (known) newAcc.badgeType = known.badgeType;
+  }
   newAcc.avatar = { type: 'gradient', value: Math.floor(Math.random() * AV_GRADS.length) };
   state.accounts.push(state.me);
   state.me = newAcc;
@@ -731,42 +1249,93 @@ $('#btn-cancel-add-acc').addEventListener('click', () => $('#add-account-modal')
 
 let currentModTargetId = null;
 
+const WARN_TEMPLATES = [
+  { t: 'رعایت نکردن قوانین', x: 'شما قوانین را رعایت نکرده‌اید. لطفاً از ادامه‌ی این رفتار خودداری کنید.' },
+  { t: 'محتوای نامناسب', x: 'محتوای منتشرشده توسط شما نامناسب است و با قوانین مطابقت ندارد.' },
+  { t: 'تبلیغات و اسپم', x: 'ارسال تبلیغات و پیام‌های تکراری ممنوع است. در صورت تکرار، دسترسی شما محدود می‌شود.' },
+  { t: 'توهین', x: 'لطفاً از توهین و بی‌احترامی به دیگران خودداری کنید.' },
+  { t: 'اطلاعات نادرست', x: 'انتشار اطلاعات نادرست و گمراه‌کننده ممنوع است.' }
+];
+
+/* مسیر ارسال اخطار: اخطاردهنده (تنظیم‌شده) ← گیرنده (کاربر یا سازنده‌ی گروه/کانال) */
+function setGlobalWarner(w) {
+  state.globalWarner = w;
+  save();
+  if (typeof activeChatId !== 'undefined' && activeChatId) applyComposerLock(getChat(activeChatId));
+}
+
+function resolveWarnRoute(targetChat) {
+  if (!targetChat) return { error: 'چت هدف پیدا نشد' };
+  if (targetChat.type === 'ai' || targetChat.type === 'saved') return { error: 'به این چت نمی‌توان اخطار داد' };
+  const warner = state.globalWarner;
+  if (!warner || !warner.name) return { error: 'اخطاردهنده تنظیم نشده است. از منوی چت، «تنظیم به عنوان اخطار دهنده» را بزنید.' };
+  const isGC = targetChat.type === 'group' || targetChat.type === 'channel';
+  const recipientRef = isGC
+    ? (targetChat.owner || { name: state.me.name, username: state.me.username || '' })
+    : { name: targetChat.name, username: targetChat.username || '' };
+  const recipient = findLocalAccount(recipientRef);
+  if (!recipient) return { error: isGC ? 'اکانت سازنده این گروه/کانال روی این دستگاه نیست' : 'اکانت این کاربر روی این دستگاه نیست' };
+  if (sameIdentity(recipient, warner)) return { error: 'اخطاردهنده نمی‌تواند به خودش اخطار بدهد' };
+  return { warner, recipient, isGC, targetChat };
+}
+
 function openWarnModal(chatId) {
   currentModTargetId = chatId;
-  $('#warn-reason-input').value = '';
+  const inp = $('#warn-reason-input');
+  inp.value = '';
+  const chat = getChat(chatId);
+  const route = resolveWarnRoute(chat);
+  const box = $('#warn-route');
+  const submit = $('#btn-submit-warn');
+  if (route.error) {
+    box.innerHTML = `<div class="wr-err">${esc(route.error)}</div>`;
+    submit.disabled = true; submit.style.opacity = '.4';
+  } else {
+    const { warner, recipient, isGC } = route;
+    const kind = isGC ? `سازنده‌ی ${chat.type === 'channel' ? 'کانال' : 'گروه'} «${esc(chat.name)}»` : 'کاربر';
+    box.innerHTML = `
+      <div class="wr-row">
+        <div class="wr-node">${avatarHTML(warner, 34)}<div class="wr-t"><b>${esc(warner.name)}</b><small>اخطاردهنده</small></div></div>
+        <span class="wr-arrow">${icon('back', 16)}</span>
+        <div class="wr-node">${avatarHTML(recipient, 34)}<div class="wr-t"><b>${esc(recipient.name)}</b><small>${kind}</small></div></div>
+      </div>
+      <div class="wr-note">در پیوی «${esc(recipient.name)}» به‌صورت پیام دریافتی از «${esc(warner.name)}» نمایش داده می‌شود.</div>`;
+    submit.disabled = false; submit.style.opacity = '';
+  }
+  $('#warn-chips').innerHTML = WARN_TEMPLATES.map((w, i) => `<button type="button" class="wchip" data-wt="${i}">${esc(w.t)}</button>`).join('');
+  $$('#warn-chips .wchip').forEach(b => b.addEventListener('click', () => {
+    inp.value = WARN_TEMPLATES[+b.dataset.wt].x;
+    inp.focus();
+  }));
   $('#warn-modal').classList.add('show');
 }
 
 $('#btn-submit-warn').addEventListener('click', () => {
   const reason = $('#warn-reason-input').value.trim();
   if (!reason) { toast('دلیل اخطار را بنویسید', 'error'); return; }
+  const closeModal = () => $('#warn-modal').classList.remove('show');
 
   const targetChat = getChat(currentModTargetId);
-  if (!targetChat) {
-    $('#warn-modal').classList.remove('show');
-    toast('چت هدف پیدا نشد', 'error');
-    return;
-  }
+  const route = resolveWarnRoute(targetChat);
+  if (route.error) { closeModal(); toast(route.error, 'error'); return; }
+  const { warner, recipient } = route;
 
-  const warner = state.globalWarner || {
-    name: state.me.name,
-    username: state.me.username,
-    avatar: state.me.avatar,
-    badgeType: state.me.badgeType
-  };
-
-  const isWarnerMe = warner.username
-    ? normUser(warner.username) === normUser(state.me.username)
-    : warner.name === state.me.name;
-
-  const warnText = `⚠️ اخطار: ${reason}`;
-
-  const buildMsg = (out) => ({
+  /* ۳) فقط در پیوی «گیرنده با اخطاردهنده» ذخیره می‌شود. در پیوی نویسنده‌ی اخطار و پیوی اخطاردهنده چیزی نمی‌رود */
+  const chatInRecipient = findOrCreatePrivateChatWithEntity(recipient, {
+    name: warner.name,
+    username: warner.username || '',
+    avatar: warner.avatar,
+    badgeType: warner.badgeType || null,
+    coverPhoto: warner.coverPhoto || null
+  });
+  chatInRecipient.messages.push({
     id: rid(),
-    text: warnText,
-    out,
+    text: `⚠️ اخطار: ${reason}`,
+    warnReason: reason,
+    warnBy: warner.name,
+    out: false,
     ts: Date.now(),
-    status: out ? 'sent' : 'read',
+    status: 'read',
     type: 'text',
     isWarning: true,
     replyTo: null,
@@ -778,136 +1347,13 @@ $('#btn-submit-warn').addEventListener('click', () => {
     linkPreview: null,
     _fakeReactionCounts: {}
   });
-
-  const isGC = targetChat.type === 'group' || targetChat.type === 'channel';
-
-  /* ============ گروه / کانال: اخطار به سازنده (خصوصی) ============ */
-  if (isGC) {
-    const owner = targetChat.owner || { name: state.me.name, username: state.me.username || '' };
-    const ownerIsMe = owner.username
-      ? normUser(owner.username) === normUser(state.me.username)
-      : owner.name === state.me.name;
-
-    if (isWarnerMe) {
-      if (ownerIsMe) {
-        toast('شما خودتان سازنده این گروه/کانال هستید', 'info');
-        $('#warn-modal').classList.remove('show');
-        return;
-      }
-
-      let ownerAccount = null;
-      if (owner.username) {
-        ownerAccount = state.accounts.find(a => normUser(a.username) === normUser(owner.username));
-      }
-      if (!ownerAccount) {
-        ownerAccount = state.accounts.find(a => a.name === owner.name);
-      }
-
-      if (!ownerAccount) {
-        toast('سازنده گروه/کانال در این دستگاه پیدا نشد', 'error');
-        $('#warn-modal').classList.remove('show');
-        return;
-      }
-
-      // پیام فقط در چت سازنده با من ذخیره می‌شود (دریافتی)
-      const chatInOwner = findOrCreatePrivateChatWithEntity(ownerAccount, {
-        name: state.me.name,
-        username: state.me.username || '',
-        avatar: state.me.avatar,
-        badgeType: state.me.badgeType,
-        coverPhoto: state.me.coverPhoto
-      });
-      chatInOwner.messages.push(buildMsg(false));
-      chatInOwner.unread = (chatInOwner.unread || 0) + 1;
-
-      // در چت خودم با سازنده چیزی نمایش داده نمی‌شود
-
-    } else {
-      if (!ownerIsMe) {
-        toast('این اخطار برای شما نیست', 'error');
-        $('#warn-modal').classList.remove('show');
-        return;
-      }
-
-      // من سازنده‌ام و اخطار از طرف یک اکانت دیگر آمده
-      const chatInMe = findOrCreatePrivateChatWithEntity(state.me, warner);
-      chatInMe.messages.push(buildMsg(false));
-      chatInMe.unread = (chatInMe.unread || 0) + 1;
-
-      if (warner.username) {
-        const warnerAcc = state.accounts.find(a => normUser(a.username) === normUser(warner.username));
-        if (warnerAcc) {
-          const chatInWarner = findOrCreatePrivateChatWithEntity(warnerAcc, {
-            name: state.me.name,
-            username: state.me.username || '',
-            avatar: state.me.avatar,
-            badgeType: state.me.badgeType,
-            coverPhoto: state.me.coverPhoto
-          });
-          chatInWarner.messages.push(buildMsg(true));
-        }
-      }
-    }
-
-    save();
-    renderChatList();
-    if (activeChatId) renderMessages(false);
-    $('#warn-modal').classList.remove('show');
-    toast('اخطار به سازنده گروه/کانال ارسال شد ✓', 'success');
-    return;
-  }
-
-  /* ============ چت خصوصی ============ */
-  if (isWarnerMe) {
-    // من اخطار دهنده‌ام → فقط در چت کاربر مقصد ذخیره می‌شود، نه در چت خودم
-    let sent = false;
-    if (targetChat.username) {
-      const targetAcc = state.accounts.find(a => normUser(a.username) === normUser(targetChat.username));
-      if (targetAcc) {
-        const chatInTarget = findOrCreatePrivateChatWithEntity(targetAcc, {
-          name: state.me.name,
-          username: state.me.username || '',
-          avatar: state.me.avatar,
-          badgeType: state.me.badgeType,
-          coverPhoto: state.me.coverPhoto
-        });
-        chatInTarget.messages.push(buildMsg(false));
-        chatInTarget.unread = (chatInTarget.unread || 0) + 1;
-        sent = true;
-      }
-    }
-    if (!sent) {
-      toast('امکان ارسال اخطار به این کاربر وجود ندارد (اکانت مقصد در این دستگاه نیست)', 'error');
-      $('#warn-modal').classList.remove('show');
-      return;
-    }
-  } else {
-    // من گیرنده‌ام و اخطار از طرف دیگری آمده → در چت خودم دریافتی
-    targetChat.messages.push(buildMsg(false));
-    targetChat.unread = (targetChat.unread || 0) + 1;
-
-    if (warner.username) {
-      const warnerAcc = state.accounts.find(a => normUser(a.username) === normUser(warner.username));
-      if (warnerAcc) {
-        const chatInWarner = findOrCreatePrivateChatWithEntity(warnerAcc, {
-          name: state.me.name,
-          username: state.me.username || '',
-          avatar: state.me.avatar,
-          badgeType: state.me.badgeType,
-          coverPhoto: state.me.coverPhoto
-        });
-        chatInWarner.messages.push(buildMsg(true));
-      }
-    }
-  }
+  chatInRecipient.unread = (chatInRecipient.unread || 0) + 1;
 
   save();
   renderChatList();
-  if (activeChatId === targetChat.id) renderMessages(false);
-  if (infoChatId === targetChat.id) renderInfo();
-
-  $('#warn-modal').classList.remove('show');
-  toast(`اخطار از طرف «${warner.name}» ارسال شد ✓`, 'success');
+  if (activeChatId && activeChatId === chatInRecipient.id) renderMessages(false);
+  closeModal();
+  toast(`اخطار از طرف «${warner.name}» برای «${recipient.name}» ارسال شد ✓`, 'success');
 });
 
 $('#btn-cancel-warn').addEventListener('click', () => $('#warn-modal').classList.remove('show'));
@@ -937,7 +1383,7 @@ function banUser(chatId) {
 }
 
 /* ---------- render: messages ---------- */
-let activeChatId = null, replyToMsg = null;
+let activeChatId = null, replyToMsg = null, replyQuote = null, replyQuoteName = null;
 let msgSearchQuery = '', msgSearchHits = [], msgSearchIndex = -1;
 const renderedIds = new Set();
 
@@ -948,6 +1394,33 @@ function highlightMatch(text, q) {
   } catch { return esc(text); }
 }
 
+function albumItemHTML(it, id) {
+  if (it.type === 'photo') {
+    const pid = it.thumbId || it.mediaId, psrc = mediaUrlSync(pid);
+    const ar = (it.w && it.h) ? Math.min(1.8, Math.max(0.6, it.w / it.h)) : 1;
+    return `<div class="mbox photo" data-view="${esc(id)}" style="aspect-ratio:${ar}"><img data-mid="${esc(pid)}" ${psrc ? `src="${esc(psrc)}"` : ''} alt="" draggable="false"></div>`;
+  }
+  if (it.type === 'video') {
+    const ar = (it.w && it.h) ? Math.min(1.8, Math.max(0.6, it.w / it.h)) : 16 / 9;
+    return `<div class="mbox video" data-slot="${esc(id)}" data-kind="video" style="aspect-ratio:${ar}"></div>`;
+  }
+  if (it.type === 'audio') return `<div class="audiobox"><div class="abox-name">🎵 <span>${esc(it.fname || 'فایل صوتی')}</span></div><div class="abox-slot" data-slot="${esc(id)}" data-kind="audio"></div></div>`;
+  return `<div class="filemsg dl" data-dl="${esc(id)}"><div class="ficon">${icon('arrow-down',22)}</div><div class="fmeta"><span class="fname">${esc(it.text || it.fname || 'file')}</span><span class="fsize">${esc(it.size || '')}</span></div></div>`;
+}
+/* تعداد نظرها بر اساس بازدید و ریکشن پست (بدون ساختن هزاران پیام واقعی) */
+function cmtTotal(m) {
+  const real = (m.comments || []).length;
+  const views = m.seenCount || 0;
+  let reacts = 0;
+  const rr = m.reactions || {}, fr = m._fakeReactionCounts || {};
+  Object.keys(rr).forEach(k => reacts += (rr[k] || []).length);
+  Object.keys(fr).forEach(k => reacts += (fr[k] || 0));
+  let h = 0; const id = String(m.id || '');
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
+  const jitter = 0.85 + (h % 31) / 100; /* 0.85 تا 1.15، برای هر پست ثابت */
+  const virtual = Math.round((views * 0.05 + reacts * 0.4) * jitter);
+  return virtual + real;
+}
 function renderReactions(m) {
   const real = m.reactions || {};
   const fake = m._fakeReactionCounts || {};
@@ -994,17 +1467,69 @@ function simulatePollVotes(chat, pollMsg) {
   }, 2000);
 }
 
+/* ---------- Pinned messages ---------- */
+const pinCursor = {};
+function getPinned(chat) { return chat ? chat.messages.filter(m => m.pinned && !m.deleted) : []; }
+function pinPreview(m) {
+  if (m.type === 'photo') return '📷 ' + (m.caption || m.text || 'عکس');
+  if (m.type === 'voice') return '🎤 پیام صوتی';
+  if (m.type === 'album') return '📎 ' + (m.caption || ((m.items || []).length.toLocaleString('fa-IR') + ' فایل'));
+  if (m.type === 'video') return '🎬 ' + (m.caption || m.text || 'ویدیو');
+  if (m.type === 'audio') return '🎵 ' + (m.fname || 'فایل صوتی');
+  if (m.type === 'file') return '📎 ' + (m.text || 'فایل');
+  if (m.type === 'location') return '📍 موقعیت مکانی';
+  if (m.type === 'poll') return '📊 ' + (m.poll && m.poll.question || 'نظرسنجی');
+  if (m.type === 'warning' || m.isWarning) return '⚠️ اخطار';
+  return stripFmt(m.text || '').replace(/\s+/g, ' ').trim();
+}
+function pinIndex(chat, n) {
+  let i = pinCursor[chat.id];
+  return (i === undefined || i < 0 || i >= n) ? n - 1 : i;
+}
+function updatePinCircle() {
+  const btn = $('#pin-circle'), box = $('#messages');
+  if (!btn) return;
+  const chat = getChat(activeChatId);
+  const list = getPinned(chat);
+  const n = list.length;
+  btn.classList.toggle('show', n > 0);
+  if (box) box.classList.toggle('has-pins', n > 0);
+  if (!n) return;
+  const i = pinIndex(chat, n);
+  const t = $('#pin-title'), x = $('#pin-text');
+  if (t) t.textContent = n > 1 ? `پیام سنجاق‌شده ${(i + 1).toLocaleString('fa-IR')} از ${n.toLocaleString('fa-IR')}` : 'پیام سنجاق‌شده';
+  if (x) x.textContent = pinPreview(list[i]) || 'پیام';
+}
+function jumpToNextPinned() {
+  const chat = getChat(activeChatId);
+  const list = getPinned(chat);
+  if (!list.length) { updatePinCircle(); return; }
+  const i = pinIndex(chat, list.length);
+  const m = list[i];
+  pinCursor[chat.id] = i - 1 < 0 ? list.length - 1 : i - 1;
+  updatePinCircle();
+  const el = $(`#messages .msg[data-id="${m.id}"]`);
+  if (!el) { toast('پیام سنجاق‌شده در دسترس نیست', 'info'); return; }
+  el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  el.classList.add('selected'); setTimeout(() => el.classList.remove('selected'), 900);
+  if (navigator.vibrate) navigator.vibrate(10);
+}
+$('#pin-circle').addEventListener('click', jumpToNextPinned);
+
 function msgHTML(chat, m, prevMsg, nextMsg) {
   const isNew = !renderedIds.has(m.id);
   renderedIds.add(m.id);
-  const cls = `msg ${m.out?'out':'in'}${isNew?'':' no-anim'}${(chat.type==='ai'&&!m.out)?' ai':''}${msgSearchHits.includes(m.id)?' search-hit':''}`;
+  const cls = `msg ${m.out?'out':'in'}${isNew?'':' no-anim'}${(chat.type==='ai'&&!m.out)?' ai':''}${(m.type === 'warning' || m.isWarning)?' warning':''}${msgSearchHits.includes(m.id)?' search-hit':''}`;
   let inner = '';
 
-  if (m.replyTo) {
-    const r = chat.messages.find(x => x.id === m.replyTo);
-    if (r) {
+  if (m.replyTo || m.quote) {
+    const r = m.replyTo ? chat.messages.find(x => x.id === m.replyTo) : null;
+    if (m.quote) {
+      const nm = r ? (r.out ? 'شما' : (r.sender || chat.name)) : (m.quoteName || chat.name);
+      inner += `<div class="reply-quote has-quote"><b>${esc(nm)}</b><p>${esc(m.quote)}</p></div>`;
+    } else if (r) {
       const nm = r.out ? 'شما' : (r.sender || chat.name);
-      const tx = r.deleted ? 'پیام حذف‌شده' : (r.type === 'text' ? r.text : 'پیوست');
+      const tx = r.deleted ? 'پیام حذف‌شده' : (r.type === 'text' ? stripFmt(r.text) : (r.caption || 'پیوست'));
       inner += `<div class="reply-quote"><b>${esc(nm)}</b><p>${esc(tx)}</p></div>`;
     }
   }
@@ -1018,13 +1543,37 @@ function msgHTML(chat, m, prevMsg, nextMsg) {
 
   if (m.deleted) {
     inner += `<div class="btext msg-deleted">🚫 این پیام حذف شد</div>`;
+  } else if (m.type === 'warning' || m.isWarning) {
+    const reasonTxt = (m.warnReason !== undefined ? m.warnReason : String(m.text || '').replace(/^⚠️\s*اخطار:\s*/, ''));
+    const wDate = new Date(m.ts).toLocaleDateString('fa-IR', { day: 'numeric', month: 'long', year: 'numeric' });
+    inner += `
+      <div class="warn-card">
+        <div class="wc-top"><span class="wc-badge">${icon('alert',14)} اخطار</span><span class="wc-when">${wDate} · ${fmtTime(m.ts)}</span></div>
+        <div class="wc-reason">${esc(reasonTxt)}</div>
+      </div>
+    `;
+  } else if (m.type === 'photo' && m.mediaId) {
+    const pid = m.thumbId || m.mediaId, psrc = mediaUrlSync(pid);
+    const ar = (m.w && m.h) ? Math.min(1.8, Math.max(0.6, m.w / m.h)) : 1;
+    inner += `<div class="mbox photo" data-view="${esc(m.id)}" style="aspect-ratio:${ar}"><img data-mid="${esc(pid)}" ${psrc ? `src="${esc(psrc)}"` : ''} alt="" draggable="false">${m.text ? `<div class="cap">${esc(m.text)}</div>` : ''}</div>`;
+  } else if (m.type === 'video' && m.mediaId) {
+    const ar = (m.w && m.h) ? Math.min(1.8, Math.max(0.6, m.w / m.h)) : 16 / 9;
+    inner += `<div class="mbox video" data-slot="${esc(m.id)}" data-kind="video" style="aspect-ratio:${ar}"></div>`;
+  } else if (m.type === 'audio' && m.mediaId) {
+    inner += `<div class="audiobox"><div class="abox-name">🎵 <span>${esc(m.fname || 'فایل صوتی')}</span></div><div class="abox-slot" data-slot="${esc(m.id)}" data-kind="audio"></div></div>`;
   } else if (m.type === 'photo') {
     if (m.dataUrl) inner += `<div class="media" style="background:#000"><img src="${esc(m.dataUrl)}" alt="">${m.text?`<div class="cap">${esc(m.text)}</div>`:''}</div>`;
     else inner += `<div class="media" style="background:${m.bg||'linear-gradient(135deg,#667eea,#764ba2)'}">${icon('camera',56)}${m.text?`<div class="cap">${esc(m.text)}</div>`:''}</div>`;
+  } else if (m.type === 'album' && Array.isArray(m.items)) {
+    const idx = m.items.map((it, i) => [it, i]);
+    const vis = idx.filter(([it]) => it.type === 'photo' || it.type === 'video');
+    const rest = idx.filter(([it]) => it.type !== 'photo' && it.type !== 'video');
+    if (vis.length) inner += `<div class="album-grid${vis.length > 1 ? ' multi' : ''}">${vis.map(([it, i]) => albumItemHTML(it, m.id + '~' + i)).join('')}</div>`;
+    inner += rest.map(([it, i]) => albumItemHTML(it, m.id + '~' + i)).join('');
   } else if (m.type === 'location') {
     inner += `<div class="media" style="background:linear-gradient(135deg,#43cea2,#185a9d)">${icon('location',56)}${m.text?`<div class="cap">${esc(m.text)}</div>`:''}</div>`;
   } else if (m.type === 'file') {
-    inner += `<div class="filemsg"><div class="ficon">${icon('file',22)}</div><div class="fmeta"><span class="fname">${esc(m.text)}</span><span class="fsize">${esc(m.size||'2.4 MB')}</span></div></div>`;
+    inner += `<div class="filemsg${m.mediaId ? ' dl' : ''}"${m.mediaId ? ` data-dl="${esc(m.id)}"` : ''}><div class="ficon">${icon(m.mediaId ? 'arrow-down' : 'file',22)}</div><div class="fmeta"><span class="fname">${esc(m.text)}</span><span class="fsize">${esc(m.size||'2.4 MB')}</span></div></div>`;
   } else if (m.type === 'voice') {
     const bars = Array.from({length:22},(_,i) => `<i style="height:${7+((i*13+(m.dur||3)*7)%16)}px"></i>`).join('');
     inner += `<div class="voice"><button class="vplay" data-play="${m.id}">${icon('play',16)}</button><div class="vwave">${bars}</div><span class="vdur">${fmtDur(m.dur||0)}</span></div>`;
@@ -1043,7 +1592,7 @@ function msgHTML(chat, m, prevMsg, nextMsg) {
       <div class="poll-footer">${totalVotes.toLocaleString('fa-IR')} رای ${hasVoted ? '· شما رای داده‌اید' : ''}</div>
     </div>`;
   } else {
-    inner += `<div class="btext">${msgSearchQuery ? highlightMatch(m.text, msgSearchQuery) : renderRichText(m.text)}</div>`;
+    inner += `<div class="btext">${msgSearchQuery ? highlightMatch(m.text, msgSearchQuery) : renderRichText(m.text, getChannelColor(chat))}</div>`;
     if (m.linkPreview && m.linkPreview.domain) {
       inner += `<a class="link-preview" href="${esc(m.linkPreview.url)}" target="_blank" rel="noopener"><div class="lp-header"><img class="lp-favicon" src="${esc(m.linkPreview.favicon)}" alt="" onerror="this.style.display='none'"><span class="lp-domain">${esc(m.linkPreview.domain)}</span></div><div class="lp-url">${esc(m.linkPreview.url)}</div></a>`;
     }
@@ -1053,19 +1602,28 @@ function msgHTML(chat, m, prevMsg, nextMsg) {
       if (mp) inner += `<a class="mention-preview" data-mention-preview="${esc(mp.username)}"><div class="mp-header"><div class="mp-avatar" style="${avatarBgStyle({name:mp.name})}">${esc(initials(mp.name))}</div><span class="mp-name">${esc(mp.name)}${mp.badgeType?vfHTML(mp.badgeType,15):''}</span></div><span class="mp-sub">@${esc(mp.username)} · ${mp.type==='channel'?'کانال':mp.type==='group'?'گروه':'کاربر'}</span></a>`;
     }
   }
+  if (m.caption && !m.deleted && (m.type === 'photo' || m.type === 'video' || m.type === 'audio' || m.type === 'file' || m.type === 'album')) {
+    inner += `<div class="btext mcap">${msgSearchQuery ? highlightMatch(m.caption, msgSearchQuery) : renderRichText(m.caption, getChannelColor(chat))}</div>`;
+  }
   inner += renderReactions(m);
 
   let ticks = '';
-  if (m.out && !m.deleted) {
+  if (m.out && !m.deleted && m.type !== 'warning') {
     if (m.status === 'read') ticks = `<span class="ticks read">${icon('double-check',15)}</span>`;
     else if (m.status === 'delivered') ticks = `<span class="ticks">${icon('double-check',15)}</span>`;
     else ticks = `<span class="ticks">${icon('check',15)}</span>`;
   }
   const metaText = `${fmtTime(m.ts)}${m.editedForAll?' · ویرایش‌شده':(m.edited?' ✎':'')}`;
   const seen = (chat.type === 'channel' && m.out && (m.seenCount || m.seenTarget)) ? `<span class="msg-seen">${icon('eye',13)} ${fmtNum(m.seenCount||0)}</span>` : '';
-  const msgInner = `${inner}<div class="meta"><span>${metaText}</span>${seen}${ticks}</div>`;
+  const pinMark = (m.pinned && !m.deleted) ? `<span class="meta-pin">${icon('pin',11)}</span>` : '';
+  const signOn = chat.type === 'channel' && chat.signMessages && m.ts >= (chat.signSince || 0) && !m.deleted && m.type !== 'warning';
+  const authorHtml = signOn ? `<span class="meta-author">${esc(m.author || (m.out ? state.me.name : chat.name))}</span><span class="meta-dot">·</span>` : '';
+  const cmtCount = cmtTotal(m);
+  const cmtBtn = (chat.type === 'channel' && chat.commentsEnabled && !m.deleted && m.type !== 'warning')
+    ? `<div class="cmt-btn" data-cmt="${esc(m.id)}">${icon('chat-outline',17)}<span>${cmtCount ? fmtNum(cmtCount) + ' نظر' : 'ارسال نظر'}</span><span class="cmt-chev">${icon('chevron',16)}</span></div>` : '';
+  const msgInner = `${inner}<div class="meta">${pinMark}${authorHtml}<span>${metaText}</span>${seen}${ticks}</div>${cmtBtn}`;
 
-  if (chat.type === 'group' && !m.out) {
+  if (chat.type === 'group' && !m.out && m.type !== 'warning') {
     const sender = m.sender || 'عضو';
     const sameBefore = prevMsg && !prevMsg.out && prevMsg.sender === sender;
     const sameAfter = nextMsg && !nextMsg.out && nextMsg.sender === sender;
@@ -1088,6 +1646,7 @@ function renderMessages(scroll = true) {
   const chat = getChat(activeChatId);
   const box = $('#messages');
   if (!box) return;
+  updatePinCircle();
   if (!chat) { box.innerHTML = ''; return; }
   box.setAttribute('data-chat-type', chat.type || 'private');
 
@@ -1129,11 +1688,13 @@ function renderMessages(scroll = true) {
     } else html += `<div class="msg${typingCls}"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>`;
   }
 
-  box.innerHTML = html;
+  patchMessages(box, html);
+  afterRender(box);
   if (scroll) requestAnimationFrame(() => { box.scrollTop = box.scrollHeight; });
 }
 
 function renderChatHeader() {
+  syncBadgesFromAccounts();
   const c = getChat(activeChatId);
   if (!c) return;
   const av = $('#chat-avatar');
@@ -1159,9 +1720,9 @@ function renderChatHeader() {
   if (status) { status.textContent = chatStatus(c); status.style.color = c.typing ? 'var(--green)' : ''; }
 }
 
-/* ---------- Wallpaper & Open/Close ---------- */
-const DEFAULT_WALLPAPER_SVG = `data:image/svg+xml;utf8,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 400 400"><rect width="100%" height="100%" fill="#131313"/><g fill="#ffffff" fill-opacity="0.04"><path d="M50 50l10-10 10 10-10 10zM150 100l15-15 15 15-15 15zM300 80l20-20 20 20-20 20zM80 250l15-15 15 15-15 15zM250 300l20-20 20 20-20 20zM350 200l10-10 10 10-10 10zM100 350l10-10 10 10-10 10zM200 180l12-12 12 12-12 12z"/><circle cx="200" cy="50" r="20"/><circle cx="50" cy="150" r="15"/><circle cx="350" cy="350" r="25"/><circle cx="300" cy="150" r="10"/><circle cx="100" cy="280" r="18"/></g></svg>')}`;
-
+/* ---------- Wallpaper ---------- */
+const WP_SHAPES = '<path d="M50 50l10-10 10 10-10 10zM150 100l15-15 15 15-15 15zM300 80l20-20 20 20-20 20zM80 250l15-15 15 15-15 15zM250 300l20-20 20 20-20 20zM350 200l10-10 10 10-10 10zM100 350l10-10 10 10-10 10zM200 180l12-12 12 12-12 12z"/><circle cx="200" cy="50" r="20"/><circle cx="50" cy="150" r="15"/><circle cx="350" cy="350" r="25"/><circle cx="300" cy="150" r="10"/><circle cx="100" cy="280" r="18"/>';
+const wpSvg = col => `data:image/svg+xml;utf8,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400" viewBox="0 0 400 400"><g fill="' + col + '" fill-opacity="0.045">' + WP_SHAPES + '</g></svg>')}`;
 function applyWallpaper(chat) {
   const box = $('#messages');
   if (!box) return;
@@ -1171,7 +1732,7 @@ function applyWallpaper(chat) {
     box.style.backgroundPosition = 'center';
     box.style.backgroundRepeat = 'no-repeat';
   } else {
-    box.style.backgroundImage = `url("${DEFAULT_WALLPAPER_SVG}")`;
+    box.style.backgroundImage = `url("${wpSvg(state.theme === 'light' ? '#000000' : '#ffffff')}")`;
     box.style.backgroundSize = 'auto';
     box.style.backgroundPosition = 'top left';
     box.style.backgroundRepeat = 'repeat';
@@ -1211,9 +1772,27 @@ function openWallpaperPicker(chat) {
   }));
 }
 
+/* قفل نوار پیام در پیوی اخطاردهنده: هیچ نوع پیامی (متن، عکس، فایل، صدا، نظرسنجی...) ارسال نمی‌شود */
+function applyComposerLock(c) {
+  const composer = $('#composer'), inp = $('#msg-input');
+  if (!composer || !inp) return;
+  const locked = !!c && isWarnerChat(c);
+  composer.classList.toggle('warner-blocked', locked);
+  inp.disabled = locked;
+  inp.placeholder = locked ? 'امکان ارسال پیام به این کاربر وجود ندارد' : 'پیام';
+  ['#btn-send', '#btn-photo', '#btn-file', '#btn-poll', '#btn-emoji'].forEach(id => { const el = $(id); if (el) el.style.display = locked ? 'none' : ''; });
+  if (locked) {
+    inp.value = '';
+    const st = $('#btn-send-text'); if (st) st.classList.remove('show');
+    try { hideReplyBar(); } catch {}
+  }
+}
+
+/* ---------- open/close ---------- */
 function openChat(id) {
   const c = getChat(id);
   if (!c) return;
+  if (activeChatId !== id) { resetMediaEls(); stopVoice(); if (pendingFiles.length) clearPending(); }
   activeChatId = id;
   c.unread = 0; c.typing = false; c.typingSender = null;
   replyToMsg = null; hideReplyBar(); closeMsgSearch(); closeProfilePreview();
@@ -1223,32 +1802,8 @@ function openChat(id) {
   $('#screen-chat').classList.add('open');
   const inp = $('#msg-input');
 
-  const isWarner = isWarnerChat(c);
-  const composer = $('#composer');
-
-  if (isWarner) {
-    composer.classList.add('warner-blocked');
-    inp.disabled = true;
-    inp.value = '';
-    inp.placeholder = 'امکان ارسال پیام به این کاربر وجود ندارد';
-    $('#btn-send').style.display = 'none';
-    $('#btn-photo').style.display = 'none';
-    $('#btn-file').style.display = 'none';
-    $('#btn-poll').style.display = 'none';
-    $('#btn-emoji').style.display = 'none';
-    $('#btn-send-text').classList.remove('show');
-  } else {
-    composer.classList.remove('warner-blocked');
-    inp.disabled = false;
-    inp.placeholder = 'پیام';
-    $('#btn-send').style.display = '';
-    $('#btn-photo').style.display = '';
-    $('#btn-file').style.display = '';
-    $('#btn-poll').style.display = '';
-    $('#btn-emoji').style.display = '';
-    if (inp) { inp.value = c.draft || ''; autoGrow(); }
-  }
-
+  applyComposerLock(c);
+  if (inp && !isWarnerChat(c)) { inp.value = c.draft || ''; autoGrow(); }
   updateSendBtnState();
   save();
 }
@@ -1257,6 +1812,7 @@ function closeChat() {
   if (c && $('#msg-input') && !isWarnerChat(c)) c.draft = $('#msg-input').value || '';
   document.body.classList.remove('in-chat');
   $('#screen-chat').classList.remove('open');
+  resetMediaEls(); stopVoice();
   activeChatId = null; replyToMsg = null;
   hideReplyBar(); closeMsgSearch(); renderChatList(); save();
 }
@@ -1278,6 +1834,7 @@ function closeInfo() {
 }
 
 function renderInfo() {
+  syncBadgesFromAccounts();
   const c = getChat(infoChatId);
   if (!c) return;
   const isGC = c.type === 'group' || c.type === 'channel';
@@ -1293,12 +1850,11 @@ function renderInfo() {
   if (isGC) badges += `<div class="info-badge ${isPublic?'public':'private'}" data-info-act="toggle-public">${isPublic?icon('globe',14)+' عمومی':icon('lock',14)+' خصوصی'}</div>`;
   if (c.badgeType) badges += `<div class="info-badge verified">${vfHTML(c.badgeType, 14)} ${BADGES[c.badgeType].title}</div>`;
 
+  let joinedDate = `<div class="info-stat">${icon('chart',16)} عضو شده در ${esc(c.joinedDate || getPersianDate())}</div>`;
   let stats = '';
   if (isGC) stats = `<div class="info-stat editable" data-info-act="edit-members">${icon('users',16)} <b>${(c.members||0).toLocaleString('fa-IR')}</b> عضو</div>`;
   else if (c.type === 'private') stats = `<div class="info-stat">${icon(c.online?'chat-outline':'phone',16)} ${c.online?'آنلاین':'آخرین بازدید به تازگی'}</div>`;
   else if (c.type === 'ai') stats = `<div class="info-stat">${icon(navigator.onLine?'sparkle':'chat-outline',16)} ${navigator.onLine?'آنلاین — پاسخ هوشمند':'آفلاین'}</div>`;
-
-  let joinedDate = `<div class="info-stat">${icon('chart',16)} عضو شده در ${esc(c.joinedDate || getPersianDate())}</div>`;
 
   const cover = `<div class="info-cover ${c.coverPhoto?'':'empty'}" data-info-act="edit-cover" style="${c.coverPhoto?`background-image:url(&quot;${esc(c.coverPhoto)}&quot;)`:''}">${c.coverPhoto?'':icon('camera',22)+' افزودن کاور'}</div>`;
   const desc = isGC ? `<div class="group"><div class="row" data-info-act="edit-description" style="cursor:pointer"><span class="r-icon">${icon('file',20)}</span><span class="r-text" style="flex:1;white-space:normal;line-height:1.5">${c.description?esc(c.description):'<span style="color:var(--text-3)">+ افزودن توضیحات</span>'}</span></div></div>` : '';
@@ -1323,6 +1879,13 @@ function renderInfo() {
       <div class="row" data-info-act="set-badge"><span class="r-icon" style="background:#6c6c6e">${icon('verified',20)}</span><span class="r-text">نشان تایید</span><span class="r-val">${c.badgeType ? BADGES[c.badgeType].title : 'بدون نشان'}</span><span class="chev">${icon('chevron',18)}</span></div>
     </div>` : '';
 
+  const chanGrp = c.type === 'channel' ? `
+    <div class="section-title">تنظیمات کانال</div>
+    <div class="group">
+      <div class="row" data-info-act="toggle-comments"><span class="r-icon purple">${icon('chat-outline',20)}</span><span class="r-text">کامنت زیر پست‌ها</span><label class="switch"><input type="checkbox" data-chset="commentsEnabled" ${c.commentsEnabled?'checked':''}><span class="sl"></span></label></div>
+      <div class="row" data-info-act="toggle-sign"><span class="r-icon purple">${icon('edit',20)}</span><span class="r-text">امضای پیام‌ها (نام نویسنده)</span><label class="switch"><input type="checkbox" data-chset="signMessages" ${c.signMessages?'checked':''}><span class="sl"></span></label></div>
+    </div>` : '';
+
   const permsGrp = isGC ? `
     <div class="section-title">مجوزها</div>
     <div class="group">
@@ -1334,7 +1897,7 @@ function renderInfo() {
 
   $('#info-body').innerHTML = `
     <div class="info-hero has-cover">${cover}<div class="avatar big info-avatar-overlay" id="info-avatar-btn" style="${avatarBgStyle(c)}">${avatarContent(c)}</div><div class="info-name">${esc(c.name)}${vfHTML(c.badgeType,26)}</div>${uBlock}${badges?`<div class="info-badges">${badges}</div>`:''}${stats}${joinedDate}</div>
-    ${desc}${settingsGrp}${permsGrp}${membersList}${joinLeave}
+    ${desc}${settingsGrp}${chanGrp}${permsGrp}${membersList}${joinLeave}
     <div class="section-title">عملیات</div>
     <div class="group">
       <div class="row" data-info-act="toggle-mute"><span class="r-icon">${icon(c.muted?'bell':'bell-off',20)}</span><span class="r-text">${c.muted?'فعال کردن اعلان':'بی‌صدا کردن'}</span></div>
@@ -1347,6 +1910,9 @@ function renderInfo() {
   $$('#info-body [data-info-act]').forEach(el => el.addEventListener('click', e => {
     if (e.target.tagName === 'INPUT' || e.target.closest('label.switch')) return;
     handleInfoAction(el.dataset.infoAct, c);
+  }));
+  $$('#info-body input[data-chset]').forEach(inp => inp.addEventListener('change', () => {
+    handleInfoAction(inp.dataset.chset === 'commentsEnabled' ? 'toggle-comments' : 'toggle-sign', c);
   }));
   $$('#info-body [data-member-name]').forEach(el => el.addEventListener('click', e => {
     if (e.target.tagName === 'INPUT' || e.target.closest('label.switch')) return;
@@ -1394,6 +1960,17 @@ function pickCoverImage(chat) {
 }
 
 function handleInfoAction(act, c) {
+  if (act === 'toggle-comments') {
+    c.commentsEnabled = !c.commentsEnabled;
+    renderInfo(); if (activeChatId === c.id) renderMessages(false); save();
+    toast(c.commentsEnabled ? 'کامنت‌ها فعال شد' : 'کامنت‌ها غیرفعال شد', 'info'); return;
+  }
+  if (act === 'toggle-sign') {
+    c.signMessages = !c.signMessages;
+    if (c.signMessages) c.signSince = Date.now();
+    renderInfo(); if (activeChatId === c.id) renderMessages(false); save();
+    toast(c.signMessages ? 'امضای پیام‌ها روشن شد' : 'امضای پیام‌ها خاموش شد', 'info'); return;
+  }
   if (act === 'join-chat') {
     c.joined = true;
     const di = (state.directory||[]).findIndex(d => d.id === c.id);
@@ -1464,17 +2041,10 @@ function handleInfoAction(act, c) {
     }, {ltr:true}); return;
   }
   if (act === 'set-badge') {
-    openSheet(`
-      <div class="sheet-title">انتخاب نشان تایید</div>
-      <div class="sheet-item" data-badge="none">${icon('ban')}بدون نشان</div>
-      <div class="sheet-item" data-badge="blue">${vfHTML('blue', 20)} نشان افراد سرشناس</div>
-      <div class="sheet-item" data-badge="yellow">${vfHTML('yellow', 20)} نشان سازمانی</div>
-      <div class="sheet-item" data-badge="green">${vfHTML('green', 20)} نشان تجاری</div>
-      <div class="sheet-item" data-badge="personal">${vfHTML('personal', 20)} نشان شخصی</div>
-    `);
+    openSheet(badgeSheetHTML());
     $$('#sheet-content [data-badge]').forEach(b => b.addEventListener('click', () => {
       const bType = b.dataset.badge;
-      c.badgeType = bType === 'none' ? null : bType;
+      setBadgeEverywhere(c, bType === 'none' ? null : bType);
       closeSheet(); renderInfo(); renderChatList(); renderChatHeader(); save();
       toast('نشان تغییر کرد', 'success');
     }));
@@ -1538,12 +2108,12 @@ function openProfilePreview(username) {
   if (isGC) badges += `<div class="info-badge ${e.isPublic?'public':'private'}">${e.isPublic?icon('globe',14)+' عمومی':icon('lock',14)+' خصوصی'}</div>`;
   if (e.badgeType) badges += `<div class="info-badge verified">${vfHTML(e.badgeType, 14)} ${BADGES[e.badgeType].title}</div>`;
 
+  let joinedDate = `<div class="info-stat">${icon('chart',16)} عضو شده در ${esc(e.joinedDate || getPersianDate())}</div>`;
   let stats = '';
   if (isGC) stats = `<div class="info-stat">${icon('users',16)} <b>${(e.members||0).toLocaleString('fa-IR')}</b> عضو</div>`;
   else if (e.type === 'private') stats = `<div class="info-stat">${icon(e.online?'chat-outline':'phone',16)} ${e.online?'آنلاین':'آخرین بازدید به تازگی'}</div>`;
 
-  let joinedDate = `<div class="info-stat">${icon('chart',16)} عضو شده در ${esc(e.joinedDate || getPersianDate())}</div>`;
-
+  // پیش‌نمایش آیدی - همیشه نشون بده
   const uBlock = e.username
     ? `<div class="info-username" id="pp-username" style="cursor:pointer" title="برای کپی کلیک کنید">@${esc(e.username)}</div>`
     : `<div class="info-username empty" style="cursor:default">بدون آیدی</div>`;
@@ -1584,6 +2154,7 @@ function openProfilePreview(username) {
   `;
   $('#screen-profile').classList.add('open');
 
+  // کلیک روی آیدی برای کپی
   const uEl = $('#pp-username');
   if (uEl && e.username) {
     uEl.onclick = () => {
@@ -1761,15 +2332,10 @@ function toggleReaction(m, emoji, chat) {
 }
 
 /* ---------- send ---------- */
-function sendMessage(extra = {}, textOverride) {
-  const chat = getChat(activeChatId);
+function sendMessage(extra = {}, textOverride, chatIdOverride) {
+  const chat = getChat(chatIdOverride || activeChatId);
   if (!chat) return;
-
-  if (isWarnerChat(chat)) {
-    toast('امکان ارسال پیام به این کاربر وجود ندارد', 'error');
-    return;
-  }
-
+  if (isWarnerChat(chat)) { toast('امکان ارسال پیام به این کاربر وجود ندارد', 'error'); return; }
   const inp = $('#msg-input');
   const text = textOverride !== undefined ? textOverride : (inp ? inp.value.trim() : '');
   if (!text && !extra.type) return;
@@ -1780,9 +2346,10 @@ function sendMessage(extra = {}, textOverride) {
     if (!isAdmin) { toast('فقط مدیران می‌توانند پیام بفرستند', 'error'); return; }
   }
   const m = Object.assign({
-    id:rid(), text, out:true, ts:Date.now(), status:'sent', type:'text',
-    replyTo:replyToMsg, reactions:{}, deleted:false, editedForAll:false,
-    seenCount:0, seenTarget:0, linkPreview:null, _fakeReactionCounts:{}
+    id:rid(), text, out:true, ts:Date.now(), status:'sent', type:'text', author:state.me.name,
+    replyTo:(chat.id === activeChatId ? replyToMsg : null), quote:(chat.id === activeChatId && replyToMsg ? replyQuote : null),
+    quoteName:(chat.id === activeChatId && replyToMsg && replyQuote ? replyQuoteName : null), reactions:{}, deleted:false, editedForAll:false,
+    seenCount:0, seenTarget:0, linkPreview:null, _fakeReactionCounts:{}, comments:[]
   }, extra);
   if (m.type === 'text' && m.text) {
     const u = firstUrl(m.text);
@@ -1797,15 +2364,16 @@ function sendMessage(extra = {}, textOverride) {
     const _tb = $('#btn-send-text');
     if (_tb) _tb.classList.remove('show');
   }
-  replyToMsg = null; hideReplyBar();
-  renderMessages(); renderChatList();
+  if (chat.id === activeChatId) { replyToMsg = null; hideReplyBar(); renderMessages(); }
+  renderChatList();
   if (chat.type === 'channel') startSeenSim(chat, m);
+  if (chat.type === 'channel' && chat.commentsEnabled) simAIComments(chat, m, 2 + Math.floor(Math.random() * 4));
   if (chat.type !== 'saved') simFakeReactions(chat, m);
   setTimeout(() => { m.status = 'delivered'; if (activeChatId === chat.id) renderMessages(false); save(); }, 600);
   setTimeout(() => { m.status = 'read'; if (activeChatId === chat.id) renderMessages(false); save(); }, 1700);
-  if (chat.type === 'ai') { if (state.settings.aiMode && navigator.onLine) scheduleAIReply(chat, m.text); else scheduleReply(chat); return; }
+  if (chat.type === 'ai') { if (state.settings.aiMode && navigator.onLine) scheduleAIReply(chat, m.text || m.caption || ''); else scheduleReply(chat); return; }
   if (state.settings.autoReply && chat.type !== 'saved' && chat.type !== 'channel') {
-    if (state.settings.aiMode && navigator.onLine) scheduleAIReply(chat, m.text);
+    if (state.settings.aiMode && navigator.onLine) scheduleAIReply(chat, m.text || m.caption || '');
     else scheduleReply(chat);
   }
   if (m.type === 'poll') simulatePollVotes(chat, m);
@@ -1926,7 +2494,7 @@ function beep() {
 const inputEl = $('#msg-input');
 const sendTextBtn = $('#btn-send-text');
 function autoGrow() { if (!inputEl) return; inputEl.style.height = 'auto'; inputEl.style.height = Math.min(inputEl.scrollHeight, 100) + 'px'; }
-function updateSendBtnState() { if (!inputEl || !sendTextBtn) return; const has = inputEl.value.trim().length > 0; sendTextBtn.classList.toggle('show', has); }
+function updateSendBtnState() { if (!inputEl || !sendTextBtn) return; const has = inputEl.value.trim().length > 0 || pendingFiles.length > 0; sendTextBtn.classList.toggle('show', has); }
 
 if (inputEl) {
   inputEl.addEventListener('input', () => {
@@ -1937,30 +2505,67 @@ if (inputEl) {
   inputEl.addEventListener('keydown', e => {
     if (e.key === 'Enter' && !e.shiftKey && state.settings.enterToSend && innerWidth > 820) {
       e.preventDefault();
-      const t = inputEl.value.trim();
-      if (t) { sendMessage(); }
+      submitComposer();
     }
+  });
+}
+/* ---------- نوار قالب‌بندی متن (بولد، ایتالیک، نقل قول ...) ---------- */
+const fmtBar = $('#fmt-bar');
+function updateFmtBar() {
+  if (!inputEl || !fmtBar) return;
+  const show = document.activeElement === inputEl && inputEl.selectionStart !== inputEl.selectionEnd;
+  fmtBar.classList.toggle('show', show);
+}
+function applyFmt(kind) {
+  const el = inputEl; if (!el) return;
+  const v = el.value, a = el.selectionStart, b = el.selectionEnd;
+  if (a === b) return;
+  if (kind === 'quote') {
+    const ls = v.lastIndexOf('\n', a - 1) + 1;
+    let le = v.indexOf('\n', b); if (le < 0) le = v.length;
+    const seg = v.slice(ls, le).split('\n');
+    const allQ = seg.every(l => /^> ?/.test(l));
+    const out = seg.map(l => allQ ? l.replace(/^> ?/, '') : '> ' + l).join('\n');
+    el.value = v.slice(0, ls) + out + v.slice(le);
+    el.setSelectionRange(ls, ls + out.length);
+  } else {
+    const mk = { bold: '**', italic: '__', strike: '~~', code: '`' }[kind];
+    if (!mk) return;
+    const sel = v.slice(a, b);
+    let out, na, nb;
+    if (sel.length >= mk.length * 2 && sel.startsWith(mk) && sel.endsWith(mk)) { out = sel.slice(mk.length, sel.length - mk.length); }
+    else { out = mk + sel + mk; }
+    el.value = v.slice(0, a) + out + v.slice(b);
+    na = a; nb = a + out.length;
+    el.setSelectionRange(na, nb);
+  }
+  el.dispatchEvent(new Event('input', { bubbles: true }));
+  el.focus();
+  updateFmtBar();
+}
+if (inputEl && fmtBar) {
+  ['select', 'keyup', 'mouseup', 'touchend', 'focus', 'blur'].forEach(ev => inputEl.addEventListener(ev, () => setTimeout(updateFmtBar, 30)));
+  document.addEventListener('selectionchange', updateFmtBar);
+  fmtBar.querySelectorAll('[data-fmt]').forEach(btn => {
+    btn.addEventListener('pointerdown', e => e.preventDefault());
+    btn.addEventListener('mousedown', e => e.preventDefault());
+    btn.addEventListener('click', e => { e.preventDefault(); applyFmt(btn.dataset.fmt); });
   });
 }
 if (sendTextBtn) {
   sendTextBtn.addEventListener('click', e => {
     e.preventDefault();
-    const t = inputEl ? inputEl.value.trim() : '';
-    if (t) sendMessage();
+    submitComposer();
   });
 }
 
 /* ---------- voice recording ---------- */
-let recInterval = null, recStart = 0, recActive = false;
+let recInterval = null, recStart = 0, recActive = false, recChatId = null;
 let mediaRecorder = null, chunks = [], stream = null;
 
 async function startRec() {
-  const chat = getChat(activeChatId);
-  if (chat && isWarnerChat(chat)) {
-    toast('امکان ارسال پیام به این کاربر وجود ندارد', 'error');
-    return;
-  }
-  recActive = true; recStart = Date.now(); chunks = [];
+  if (!checkCanSend(getChat(activeChatId))) return;
+  recActive = true; recStart = Date.now(); chunks = []; recChatId = activeChatId;
   $('#composer').style.display = 'none';
   $('#rec-bar').classList.add('show');
   $('#rec-time').textContent = '0:00';
@@ -1997,12 +2602,17 @@ function stopRec(cancel) {
       const blob = new Blob(chunks, {type:mediaRecorder.mimeType || 'audio/webm'});
       cleanup();
       if (cancel || dur < 0.8) { toast('ضبط لغو شد', 'info'); return; }
-      const reader = new FileReader();
-      reader.onload = () => {
-        sendMessage({ type:'voice', dur:Math.round(dur*10)/10, dataUrl:reader.result, size:fmtBytes(blob.size) }, '');
+      const vChatId = recChatId;
+      if (pendingFiles.length && pendingChatId === vChatId) {
+        const ext = /mp4|aac/.test(blob.type) ? '.m4a' : '.webm';
+        stageFiles([new File([blob], 'voice-' + Date.now() + ext, { type: blob.type || 'audio/webm' })], vChatId);
+        toast('ویس به فایل‌ها اضافه شد', 'success');
+        return;
+      }
+      mediaPut(blob).then(mediaId => {
+        sendMessage({ type:'voice', dur:Math.round(dur*10)/10, mediaId, mime:blob.type || 'audio/webm', size:fmtBytes(blob.size) }, '', vChatId);
         toast('پیام صوتی ارسال شد', 'success');
-      };
-      reader.readAsDataURL(blob);
+      }).catch(() => toast('ذخیره‌ی پیام صوتی ممکن نشد', 'error'));
     };
     try { mediaRecorder.stop(); } catch { cleanup(); }
   } else {
@@ -2015,21 +2625,106 @@ const recCancelBtn = $('#rec-cancel');
 if (recCancelBtn) recCancelBtn.addEventListener('click', () => stopRec(true));
 
 /* ---------- reply bar ---------- */
-function showReplyBar(m) {
+function showReplyBar(m, quote) {
   replyToMsg = m.id;
+  replyQuote = quote || null;
   const chat = getChat(activeChatId);
-  $('#rb-name').textContent = m.out ? 'شما' : (m.sender || chat.name);
-  $('#rb-text').textContent = m.deleted ? 'پیام حذف‌شده' : (m.type === 'text' ? m.text : 'پیوست');
+  const nm = m.out ? 'شما' : (m.sender || chat.name);
+  replyQuoteName = nm;
+  $('#rb-name').textContent = quote ? 'نقل قول از ' + nm : nm;
+  $('#rb-text').textContent = quote ? quote : (m.deleted ? 'پیام حذف‌شده' : (m.type === 'text' ? stripFmt(m.text) : (m.caption || 'پیوست')));
+  $('#reply-bar').classList.toggle('is-quote', !!quote);
   $('#reply-bar').classList.add('show');
+  layoutAttachBar();
   if (inputEl) inputEl.focus();
 }
-function hideReplyBar() { replyToMsg = null; const el = $('#reply-bar'); if (el) el.classList.remove('show'); }
+function hideReplyBar() { replyToMsg = null; replyQuote = null; replyQuoteName = null; const el = $('#reply-bar'); if (el) { el.classList.remove('show'); el.classList.remove('is-quote'); } layoutAttachBar(); }
+
+/* ---------- نقل قول (انتخاب بخشی از متن پیام) ---------- */
+function openQuotePicker(chat, m) {
+  const src = String(m.type === 'text' ? (m.text || '') : (m.caption || '')).trim();
+  if (!src) return;
+  openSheet(`<div class="sheet-title">نقل قول</div>
+    <div class="qp-hint">بخشی از متن را انتخاب کن، یا کل پیام را نقل کن</div>
+    <div class="qp-box" id="qp-box">${esc(src)}</div>
+    <div class="qp-actions"><button class="qp-btn" id="qp-sel">نقل بخش انتخاب‌شده</button><button class="qp-btn ok" id="qp-all">نقل کل پیام</button></div>`);
+  const box = $('#qp-box');
+  let last = '';
+  const onSel = () => {
+    if (!document.getElementById('qp-box')) { document.removeEventListener('selectionchange', onSel); return; }
+    const sel = window.getSelection();
+    if (sel && sel.rangeCount && !sel.isCollapsed && box.contains(sel.anchorNode) && box.contains(sel.focusNode)) last = sel.toString().trim();
+  };
+  document.addEventListener('selectionchange', onSel);
+  const pick = text => {
+    document.removeEventListener('selectionchange', onSel);
+    closeSheet();
+    showReplyBar(m, text.length > 300 ? text.slice(0, 300) + '…' : text);
+  };
+  ['qp-sel', 'qp-all'].forEach(id => { const b = $('#' + id); b.addEventListener('mousedown', e => e.preventDefault()); b.addEventListener('touchstart', e => e.preventDefault(), { passive: false }); });
+  $('#qp-sel').onclick = () => { if (!last) { toast('اول بخشی از متن را انتخاب کن', 'info'); return; } pick(last); };
+  $('#qp-all').onclick = () => pick(src);
+}
 const rbClose = $('#rb-close');
 if (rbClose) rbClose.addEventListener('click', hideReplyBar);
 
 /* ---------- messages click / double tap / long press / right click ---------- */
-let currentAudio = null, currentAudioBtn = null;
+let currentAudio = null, currentAudioBtn = null, currentAudioMsgId = null;
 
+function setVoiceBtn(btn, playing) {
+  if (!btn) return;
+  btn.innerHTML = icon(playing ? 'pause' : 'play', 16);
+  btn.classList.toggle('playing', !!playing);
+  const msg = btn.closest('.msg');
+  if (msg) msg.querySelectorAll('.vwave i').forEach((b, i) => { b.style.animation = playing ? `vpulse .45s ${i*0.04}s infinite alternate` : ''; });
+}
+function setVoiceTime(msgId, sec, total) {
+  const el = document.querySelector(`#messages .msg[data-id="${msgId}"] .vdur`);
+  if (el) el.textContent = fmtDur(sec != null ? sec : total);
+}
+function stopVoice() {
+  const id = currentAudioMsgId;
+  if (currentAudio) { try { currentAudio.pause(); } catch {} }
+  setVoiceBtn(currentAudioBtn, false);
+  if (id) {
+    const chat = getChat(activeChatId), m = chat && chat.messages.find(x => x.id === id);
+    setVoiceTime(id, null, m ? (m.dur || 0) : 0);
+  }
+  currentAudio = null; currentAudioBtn = null; currentAudioMsgId = null;
+}
+function syncVoiceUI() {
+  if (!currentAudio || !currentAudioMsgId) return;
+  const btn = document.querySelector(`#messages .msg[data-id="${currentAudioMsgId}"] .vplay`);
+  if (!btn) return;
+  currentAudioBtn = btn;
+  setVoiceBtn(btn, !currentAudio.paused);
+  setVoiceTime(currentAudioMsgId, currentAudio.currentTime, 0);
+}
+async function toggleVoice(btn, m) {
+  if (currentAudio && currentAudioMsgId === m.id) {
+    if (currentAudio.paused) { currentAudio.play().catch(() => {}); setVoiceBtn(btn, true); }
+    else { currentAudio.pause(); setVoiceBtn(btn, false); }
+    return;
+  }
+  stopVoice();
+  pauseAllMedia();
+  if (!m.mediaId && !m.dataUrl) {            // پیام‌های قدیمیِ شبیه‌سازی‌شده
+    setVoiceBtn(btn, true);
+    setTimeout(() => setVoiceBtn(btn, false), (m.dur || 3) * 1000);
+    return;
+  }
+  const src = m.mediaId ? await mediaUrl(m.mediaId) : m.dataUrl;
+  if (!src) { toast('فایل صوتی پیدا نشد', 'error'); return; }
+  const a = new Audio(src);
+  currentAudio = a; currentAudioBtn = btn; currentAudioMsgId = m.id;
+  setVoiceBtn(btn, true);
+  a.ontimeupdate = () => { if (currentAudio === a) setVoiceTime(m.id, a.currentTime, 0); };
+  a.onended = () => { if (currentAudio === a) stopVoice(); };
+  a.onerror = () => { if (currentAudio === a) { stopVoice(); toast('این پیام صوتی پخش نشد', 'error'); } };
+  a.play().catch(() => { if (currentAudio === a) { stopVoice(); toast('پخش ممکن نشد', 'error'); } });
+}
+
+let lastLongPressTs = 0;
 $('#messages').addEventListener('click', e => {
   const mp = e.target.closest('.mention-preview');
   if (mp) { openProfilePreview(mp.dataset.mentionPreview); return; }
@@ -2042,57 +2737,48 @@ $('#messages').addEventListener('click', e => {
     if (m) { toggleReaction(m, rp.dataset.reactEmoji, chat); renderMessages(false); save(); }
     return;
   }
+  const recentLong = Date.now() - lastLongPressTs < 700;
+  const cb = e.target.closest('.cmt-btn');
+  if (cb) { if (!recentLong) openComments(activeChatId, cb.dataset.cmt); return; }
+  const fd = e.target.closest('.filemsg[data-dl]');
+  if (fd) {
+    if (recentLong) return;
+    const chat = getChat(activeChatId), m = findMedia(chat, fd.dataset.dl);
+    if (m && m.mediaId) downloadMedia(m);
+    return;
+  }
+  const pv = e.target.closest('.mbox.photo[data-view]');
+  if (pv) {
+    if (recentLong) return;
+    const chat = getChat(activeChatId), m = findMedia(chat, pv.dataset.view);
+    if (m) openViewer(m, pv.dataset.view);
+    return;
+  }
   const btn = e.target.closest('.vplay');
   if (!btn) return;
   const msgEl = btn.closest('.msg');
   const chat = getChat(activeChatId);
   const m = chat.messages.find(x => x.id === msgEl.dataset.id);
   if (!m) return;
-  if (currentAudio && currentAudioBtn === btn) {
-    if (currentAudio.paused) { currentAudio.play().catch(()=>{}); btn.innerHTML = icon('pause',16); btn.classList.add('playing'); }
-    else { currentAudio.pause(); btn.innerHTML = icon('play',16); btn.classList.remove('playing'); }
-    return;
-  }
-  if (currentAudio) {
-    try { currentAudio.pause(); } catch {}
-    if (currentAudioBtn) {
-      currentAudioBtn.innerHTML = icon('play',16);
-      currentAudioBtn.classList.remove('playing');
-      const pm = currentAudioBtn.closest('.msg');
-      if (pm) pm.querySelectorAll('.vwave i').forEach(b => b.style.animation = '');
-    }
-  }
-  if (m.dataUrl) {
-    currentAudio = new Audio(m.dataUrl);
-    currentAudioBtn = btn;
-    btn.innerHTML = icon('pause',16);
-    btn.classList.add('playing');
-    const bars = msgEl.querySelectorAll('.vwave i');
-    bars.forEach((b,i) => b.style.animation = `vpulse .45s ${i*0.04}s infinite alternate`);
-    const stop = () => {
-      btn.innerHTML = icon('play',16);
-      btn.classList.remove('playing');
-      bars.forEach(b => b.style.animation = '');
-      currentAudio = null; currentAudioBtn = null;
-    };
-    currentAudio.onended = stop;
-    currentAudio.onerror = stop;
-    currentAudio.play().catch(stop);
-    return;
-  }
-  btn.innerHTML = icon('pause',16);
-  btn.classList.add('playing');
-  const bars = msgEl.querySelectorAll('.vwave i');
-  bars.forEach((b,i) => b.style.animation = `vpulse .45s ${i*0.04}s infinite alternate`);
-  setTimeout(() => {
-    btn.innerHTML = icon('play',16);
-    btn.classList.remove('playing');
-    bars.forEach(b => b.style.animation = '');
-  }, (m.dur || 3) * 1000);
+  toggleVoice(btn, m);
 });
+
+/* وقتی یه ویدیو/صوت شروع به پخش می‌کنه، بقیه (و ویس‌ها) ساکت می‌شن */
+$('#messages').addEventListener('play', e => {
+  if (e.target.tagName !== 'VIDEO' && e.target.tagName !== 'AUDIO') return;
+  stopVoice(); pauseAllMedia(e.target);
+}, true);
+['pause', 'ended'].forEach(ev => $('#messages').addEventListener(ev, e => {
+  if (e.target.tagName !== 'VIDEO' && e.target.tagName !== 'AUDIO') return;
+  if (mediaDeferred && !$$('#messages video, #messages audio').some(x => !x.paused && !x.ended)) {
+    mediaDeferred = false;
+    setTimeout(() => { if (activeChatId) renderMessages(false); }, 60);
+  }
+}, true));
 
 let lastTapTime = 0, lastTapId = null;
 $('#messages').addEventListener('pointerup', e => {
+  if (e.target.closest('.cmt-btn, video, audio')) return;
   if (e.target.closest('.mention-preview') || e.target.closest('.mention-link') ||
       e.target.closest('.link-preview') || e.target.closest('.reaction-pill') || e.target.closest('.poll-opt')) return;
   const el = e.target.closest('.msg');
@@ -2108,6 +2794,7 @@ $('#messages').addEventListener('pointerup', e => {
 
 let pressTimer = null, pressStart = null, pressedMsgEl = null;
 $('#messages').addEventListener('pointerdown', e => {
+  if (e.target.closest('.cmt-btn, video, audio')) return;
   if (e.target.closest('.reaction-pill') || e.target.closest('.mention-preview') ||
       e.target.closest('.mention-link') || e.target.closest('.link-preview') || e.target.closest('.poll-opt')) return;
   const el = e.target.closest('.msg');
@@ -2115,7 +2802,7 @@ $('#messages').addEventListener('pointerdown', e => {
   pressStart = {x:e.clientX, y:e.clientY};
   pressedMsgEl = el;
   pressTimer = setTimeout(() => {
-    if (pressedMsgEl) { if (navigator.vibrate) navigator.vibrate(15); showMsgMenu(pressedMsgEl); }
+    if (pressedMsgEl) { lastLongPressTs = Date.now(); if (navigator.vibrate) navigator.vibrate(15); showMsgMenu(pressedMsgEl); }
     pressTimer = null; pressStart = null;
   }, 450);
 });
@@ -2129,6 +2816,7 @@ $('#messages').addEventListener('pointermove', e => {
   $('#messages').addEventListener(ev, () => { clearTimeout(pressTimer); pressTimer = null; pressStart = null; }));
 
 $('#messages').addEventListener('contextmenu', e => {
+  if (e.target.closest('.cmt-btn, video, audio')) { e.preventDefault(); return; }
   const el = e.target.closest('.msg');
   if (!el || el.classList.contains('typing')) return;
   if (e.target.closest('.reaction-pill') || e.target.closest('.mention-preview') ||
@@ -2144,13 +2832,18 @@ function showMsgMenu(el) {
   el.classList.add('selected');
   setTimeout(() => el.classList.remove('selected'), 400);
   let items = `<div class="sheet-item" data-mact="reply">${icon('reply')}پاسخ</div>`;
-  items += `<div class="sheet-item" data-mact="react">${icon('smile')}واکنش</div>`;
-  if (m.type === 'text' && !m.deleted) items += `<div class="sheet-item" data-mact="copy">${icon('copy')}کپی</div>`;
+  if (!m.deleted) items += `<div class="sheet-item" data-mact="pin">${icon('pin')}${m.pinned?'برداشتن سنجاق':'سنجاق کردن پیام'}</div>`;
+  if (m.type !== 'warning') {
+    items += `<div class="sheet-item" data-mact="react">${icon('smile')}واکنش</div>`;
+  }
+  if ((m.type === 'text' || m.caption) && !m.deleted) items += `<div class="sheet-item" data-mact="quote">${icon('reply')}پاسخ با نقل قول</div>`;
+  if ((m.type === 'text' || m.caption) && !m.deleted) items += `<div class="sheet-item" data-mact="copy">${icon('copy')}کپی</div>`;
+  if (m.type === 'album' && !m.deleted) items += `<div class="sheet-item" data-mact="download">${icon('save')}ذخیره‌ی همه‌ی فایل‌ها</div>`;
+  if (m.mediaId && !m.deleted) items += `<div class="sheet-item" data-mact="download">${icon('save')}ذخیره در دستگاه</div>`;
   if (m.out && m.type === 'text' && !m.deleted) items += `<div class="sheet-item" data-mact="edit">${icon('edit')}ویرایش</div>`;
   if (!m.deleted && chat.type !== 'saved') items += `<div class="sheet-item" data-mact="save">${icon('bookmark')}ذخیره</div>`;
   items += `<div class="sheet-item" data-mact="forward">${icon('forward')}هدایت</div>`;
   if (chat.type !== 'ai' && chat.type !== 'saved') {
-    items += `<div class="sheet-item" data-mact="give-badge">${icon('verified')}دادن نشان تایید</div>`;
     items += `<div class="sheet-item" data-mact="warn" style="color:#f59e0b">${icon('alert')}ارسال اخطار</div>`;
     items += `<div class="sheet-item" data-mact="set-warner">${icon('user')}تنظیم به عنوان اخطار دهنده</div>`;
     items += `<div class="sheet-item danger" data-mact="ban">${icon('ban')}بن کردن</div>`;
@@ -2187,7 +2880,7 @@ function saveToSaved(chat, m) {
   }
   saved.messages.push({
     id:rid(), text:m.text, out:true, ts:Date.now(), status:'sent', type:m.type, replyTo:null,
-    dur:m.dur, bg:m.bg, size:m.size, dataUrl:m.dataUrl, savedFrom:chat.name, originalSender:m.sender||null, poll:m.poll,
+    dur:m.dur, bg:m.bg, size:m.size, dataUrl:m.dataUrl, ...mediaFields(m), savedFrom:chat.name, originalSender:m.sender||null, poll:m.poll,
     reactions:{}, deleted:false, editedForAll:false, seenCount:0, seenTarget:0, linkPreview:m.linkPreview||null, _fakeReactionCounts:{}
   });
   save(); renderChatList(); toast('ذخیره شد ✓', 'success');
@@ -2195,7 +2888,20 @@ function saveToSaved(chat, m) {
 
 function handleMsgAction(act, chat, m) {
   if (act === 'reply') { showReplyBar(m); return; }
-  if (act === 'copy') { copyClip(m.text||'').then(()=>toast('کپی شد', 'success'), ()=>toast('کپی نشد', 'error')); return; }
+  if (act === 'quote') { openQuotePicker(chat, m); return; }
+  if (act === 'pin') {
+    m.pinned = !m.pinned;
+    if (m.pinned) m.pinTs = Date.now(); else delete m.pinTs;
+    delete pinCursor[chat.id];
+    renderMessages(false); save();
+    toast(m.pinned ? 'پیام سنجاق شد' : 'سنجاق برداشته شد', 'info');
+    return;
+  }
+  if (act === 'download') {
+    if (m.type === 'album') { (m.items || []).filter(x => x.mediaId).forEach((it, i) => setTimeout(() => downloadMedia(it), i * 450)); return; }
+    downloadMedia(m); return;
+  }
+  if (act === 'copy') { copyClip((m.type === 'text' ? m.text : m.caption) || m.text || '').then(()=>toast('کپی شد', 'success'), ()=>toast('کپی نشد', 'error')); return; }
   if (act === 'edit') {
     showPrompt('ویرایش پیام', m.text, val => {
       if (!val.trim()) return;
@@ -2210,7 +2916,8 @@ function handleMsgAction(act, chat, m) {
     openSheet(`<div class="sheet-title">هدایت به…</div>` + state.chats.map(c => `<div class="sheet-item" data-fwd="${c.id}">${avatarHTML(c,38)}${esc(c.name)}</div>`).join(''));
     $$('#sheet-content [data-fwd]').forEach(b => b.addEventListener('click', () => {
       const t = getChat(b.dataset.fwd);
-      t.messages.push({ id:rid(), text:m.text, out:true, ts:Date.now(), status:'sent', type:m.type, replyTo:null, dur:m.dur, bg:m.bg, size:m.size, dataUrl:m.dataUrl, forwarded:true, originalSender:m.sender||null, poll:m.poll, reactions:{}, deleted:false, editedForAll:false, seenCount:0, seenTarget:0, linkPreview:m.linkPreview||null, _fakeReactionCounts:{} });
+      if (t && isWarnerChat(t)) { toast('امکان ارسال پیام به این کاربر وجود ندارد', 'error'); return; }
+      t.messages.push({ id:rid(), text:m.text, out:true, ts:Date.now(), status:'sent', type:m.type, replyTo:null, dur:m.dur, bg:m.bg, size:m.size, dataUrl:m.dataUrl, ...mediaFields(m), forwarded:true, originalSender:m.sender||null, poll:m.poll, reactions:{}, deleted:false, editedForAll:false, seenCount:0, seenTarget:0, linkPreview:m.linkPreview||null, _fakeReactionCounts:{} });
       closeSheet(); renderChatList(); save(); toast('هدایت شد', 'success');
     })); return;
   }
@@ -2218,32 +2925,15 @@ function handleMsgAction(act, chat, m) {
   if (act === 'set-warner') {
     const targetName = m.sender || chat.name;
     const targetUsername = m.sender ? '' : (chat.username || '');
-    state.globalWarner = { name: targetName, username: targetUsername, avatar: m.senderAvatar || chat.avatar, badgeType: m.senderBadge || chat.badgeType };
+    setGlobalWarner({ name: targetName, username: targetUsername, avatar: m.senderAvatar || chat.avatar, badgeType: m.sender ? null : chat.badgeType });
     save();
     toast(`«${targetName}» به عنوان اخطار دهنده تنظیم شد ✓`, 'success');
-    return;
-  }
-  if (act === 'give-badge') {
-    openSheet(`
-      <div class="sheet-title">انتخاب نشان تایید</div>
-      <div class="sheet-item" data-badge="none">${icon('ban')}بدون نشان</div>
-      <div class="sheet-item" data-badge="blue">${vfHTML('blue', 20)} نشان افراد سرشناس</div>
-      <div class="sheet-item" data-badge="yellow">${vfHTML('yellow', 20)} نشان سازمانی</div>
-      <div class="sheet-item" data-badge="green">${vfHTML('green', 20)} نشان تجاری</div>
-      <div class="sheet-item" data-badge="personal">${vfHTML('personal', 20)} نشان شخصی</div>
-    `);
-    $$('#sheet-content [data-badge]').forEach(b => b.addEventListener('click', () => {
-      const bType = b.dataset.badge;
-      if (chat.type === 'private') chat.badgeType = bType === 'none' ? null : bType;
-      closeSheet(); renderMessages(false); renderChatList(); save();
-      toast('نشان داده شد', 'success');
-    }));
     return;
   }
   if (act === 'ban') { banUser(chat.id); return; }
   if (act === 'delete-all') {
     showConfirm('حذف برای همه', 'این پیام برای همه حذف شود؟', () => {
-      m.deleted = true; m.text = ''; m.dataUrl = null; m.linkPreview = null;
+      m.deleted = true; m.pinned = false; m.text = ''; m.dataUrl = null; m.mediaId = null; m.thumbId = null; m.items = null; m.comments = []; m.linkPreview = null;
       m.reactions = {}; m._fakeReactionCounts = {};
       renderMessages(false); renderChatList(); save(); toast('حذف شد', 'success');
     }); return;
@@ -2353,17 +3043,10 @@ function showChatMenu(id) {
     setTimeout(() => {
       if (act === 'open') { openChat(c.id); return; }
       if (act === 'verified') {
-        openSheet(`
-          <div class="sheet-title">انتخاب نشان تایید</div>
-          <div class="sheet-item" data-badge="none">${icon('ban')}بدون نشان</div>
-          <div class="sheet-item" data-badge="blue">${vfHTML('blue', 20)} نشان افراد سرشناس</div>
-          <div class="sheet-item" data-badge="yellow">${vfHTML('yellow', 20)} نشان سازمانی</div>
-          <div class="sheet-item" data-badge="green">${vfHTML('green', 20)} نشان تجاری</div>
-          <div class="sheet-item" data-badge="personal">${vfHTML('personal', 20)} نشان شخصی</div>
-        `);
+        openSheet(badgeSheetHTML());
         $$('#sheet-content [data-badge]').forEach(b2 => b2.addEventListener('click', () => {
           const bType = b2.dataset.badge;
-          c.badgeType = bType === 'none' ? null : bType;
+          setBadgeEverywhere(c, bType === 'none' ? null : bType);
           closeSheet(); renderChatList(); save();
           toast('نشان تغییر کرد', 'success');
         }));
@@ -2375,7 +3058,7 @@ function showChatMenu(id) {
       if (act === 'read') { c.unread = 0; renderChatList(); save(); toast('خوانده شد', 'success'); return; }
       if (act === 'warn') { openWarnModal(c.id); return; }
       if (act === 'set-warner') {
-        state.globalWarner = { name: c.name, username: c.username || '', avatar: c.avatar, badgeType: c.badgeType };
+        setGlobalWarner({ name: c.name, username: c.username || '', avatar: c.avatar, badgeType: c.badgeType });
         save();
         toast(`«${c.name}» به عنوان اخطار دهنده تنظیم شد ✓`, 'success');
         return;
@@ -2523,7 +3206,7 @@ function bindEmojis(scope) {
     autoGrow();
     updateSendBtnState();
     const c = getChat(activeChatId);
-    if (c) { c.draft = inputEl.value; save(); }
+    if (c && !isWarnerChat(c)) { c.draft = inputEl.value; save(); }
   }));
 }
 emojiOverlay.addEventListener('click', e => { if (e.target === emojiOverlay) emojiOverlay.classList.remove('show'); });
@@ -2532,7 +3215,7 @@ emojiOverlay.addEventListener('click', e => { if (e.target === emojiOverlay) emo
 const _btnPhoto = $('#btn-photo');
 if (_btnPhoto) _btnPhoto.addEventListener('click', () => pickPhotoForMessage());
 const _btnFile = $('#btn-file');
-if (_btnFile) _btnFile.addEventListener('click', () => { sendMessage({type:'file', text:'document.pdf', size:'1.8 MB'}, ''); });
+if (_btnFile) _btnFile.addEventListener('click', () => pickMedia(''));
 const _btnPoll = $('#btn-poll');
 if (_btnPoll) _btnPoll.addEventListener('click', () => {
   $('#poll-q-input').value = '';
@@ -2567,24 +3250,7 @@ if (_btnEmoji) _btnEmoji.addEventListener('click', openEmoji);
 const _btnSend = $('#btn-send');
 if (_btnSend) _btnSend.addEventListener('click', e => { e.preventDefault(); if (recActive) stopRec(false); else startRec(); });
 
-function pickPhotoForMessage() {
-  const chat = getChat(activeChatId);
-  if (chat && isWarnerChat(chat)) {
-    toast('امکان ارسال پیام به این کاربر وجود ندارد', 'error');
-    return;
-  }
-  const inp = document.createElement('input');
-  inp.type = 'file'; inp.accept = 'image/*,video/*';
-  inp.onchange = () => {
-    const f = inp.files[0]; if (!f) return;
-    if (f.type.startsWith('video/')) {
-      sendMessage({type:'file', text:f.name || 'video.mp4', size:fmtBytes(f.size)}, '');
-      return;
-    }
-    resizeImage(f, 1080, url => { sendMessage({type:'photo', text:'', dataUrl:url, size:fmtBytes(f.size)}, ''); });
-  };
-  inp.click();
-}
+function pickPhotoForMessage() { pickMedia('image/*,video/*'); }
 
 /* ---------- chat menu (3-line in chat header) ---------- */
 $('#btn-chat-menu').addEventListener('click', () => {
@@ -2593,17 +3259,17 @@ $('#btn-chat-menu').addEventListener('click', () => {
   const memberItem = (c.type === 'group' || c.type === 'channel') ? `<div class="sheet-item" data-cact="members">${icon('users')}تعداد اعضا (${(c.members||0).toLocaleString('fa-IR')})</div>` : '';
   const coverItem = (c.type === 'group' || c.type === 'channel') ? `<div class="sheet-item" data-cact="cover">${icon('image')}${c.coverPhoto?'تغییر کاور':'افزودن کاور'}</div>` : '';
   const descItem = (c.type === 'group' || c.type === 'channel') ? `<div class="sheet-item" data-cact="desc">${icon('file')}${c.description?'ویرایش توضیحات':'افزودن توضیحات'}</div>` : '';
+  const chOpts = c.type === 'channel' ? `<div class="sheet-item" data-cact="toggle-comments">${icon('chat-outline')}${c.commentsEnabled ? 'غیرفعال کردن کامنت‌ها' : 'فعال کردن کامنت‌ها'}</div><div class="sheet-item" data-cact="toggle-sign">${icon('edit')}${c.signMessages ? 'خاموش کردن امضای پیام‌ها' : 'روشن کردن امضای پیام‌ها'}</div>` : '';
   const warnBtn = (c.type !== 'ai' && c.type !== 'saved') ? `<div class="sheet-item" data-cact="warn" style="color:#f59e0b">${icon('alert')}ارسال اخطار</div>` : '';
   const setWarnerBtn = (c.type !== 'ai' && c.type !== 'saved') ? `<div class="sheet-item" data-cact="set-warner">${icon('user')}تنظیم به عنوان اخطار دهنده</div>` : '';
   const banBtn = (c.type !== 'ai' && c.type !== 'saved') ? `<div class="sheet-item danger" data-cact="ban">${icon('ban')}بن کردن</div>` : '';
-
   openSheet(`
     <div class="sheet-title">${esc(c.name)}</div>
     <div class="sheet-item" data-cact="search">${icon('search')}جستجو در پیام‌ها</div>
     <div class="sheet-item" data-cact="info">${icon('user')}اطلاعات چت</div>
     <div class="sheet-item" data-cact="avatar">${icon('image')}تنظیم پروفایل</div>
     <div class="sheet-item" data-cact="wallpaper">${icon('image')}تغییر پس‌زمینه چت</div>
-    ${coverItem}${descItem}
+    ${coverItem}${descItem}${chOpts}
     <div class="sheet-item" data-cact="verified">${icon('verified')}تغییر نشان تایید</div>
     <div class="sheet-item" data-cact="rename">${icon('edit')}تغییر نام</div>
     ${memberItem}
@@ -2613,14 +3279,13 @@ $('#btn-chat-menu').addEventListener('click', () => {
     <div class="sheet-item" data-cact="clear">${icon('trash')}پاک کردن تاریخچه</div>
     <div class="sheet-item danger" data-cact="delete">${icon('trash')}حذف گفتگو</div>
   `);
-
   $$('#sheet-content [data-cact]').forEach(b => b.addEventListener('click', () => {
     const act = b.dataset.cact;
     closeSheet();
     setTimeout(() => {
       if (act === 'warn') { openWarnModal(c.id); return; }
       if (act === 'set-warner') {
-        state.globalWarner = { name: c.name, username: c.username || '', avatar: c.avatar, badgeType: c.badgeType };
+        setGlobalWarner({ name: c.name, username: c.username || '', avatar: c.avatar, badgeType: c.badgeType });
         save();
         toast(`«${c.name}» به عنوان اخطار دهنده تنظیم شد ✓`, 'success');
         return;
@@ -2629,21 +3294,13 @@ $('#btn-chat-menu').addEventListener('click', () => {
       if (act === 'search') { openMsgSearch(); return; }
       if (act === 'info') { openInfo(c.id); return; }
       if (act === 'avatar') { openAvatarPicker('chat', c.id); return; }
-      if (act === 'wallpaper') { openWallpaperPicker(c); return; }
       if (act === 'cover') { pickCoverImage(c); return; }
       if (act === 'desc') { showPrompt('توضیحات', c.description||'', v => { c.description = v.trim(); renderChatList(); save(); toast('ذخیره شد', 'success'); }); return; }
       if (act === 'verified') {
-        openSheet(`
-          <div class="sheet-title">انتخاب نشان تایید</div>
-          <div class="sheet-item" data-badge="none">${icon('ban')}بدون نشان</div>
-          <div class="sheet-item" data-badge="blue">${vfHTML('blue', 20)} نشان افراد سرشناس</div>
-          <div class="sheet-item" data-badge="yellow">${vfHTML('yellow', 20)} نشان سازمانی</div>
-          <div class="sheet-item" data-badge="green">${vfHTML('green', 20)} نشان تجاری</div>
-          <div class="sheet-item" data-badge="personal">${vfHTML('personal', 20)} نشان شخصی</div>
-        `);
+        openSheet(badgeSheetHTML());
         $$('#sheet-content [data-badge]').forEach(b2 => b2.addEventListener('click', () => {
           const bType = b2.dataset.badge;
-          c.badgeType = bType === 'none' ? null : bType;
+          setBadgeEverywhere(c, bType === 'none' ? null : bType);
           closeSheet(); renderChatHeader(); renderChatList(); save();
           toast('نشان تغییر کرد', 'success');
         }));
@@ -2653,6 +3310,8 @@ $('#btn-chat-menu').addEventListener('click', () => {
       if (act === 'members') { showPrompt('تعداد اعضا', String(c.members||0), v => { const n = parseInt(v, 10); if (isNaN(n) || n < 0) { toast('عدد معتبر', 'error'); return; } c.members = Math.min(n, 9999999); renderChatHeader(); renderChatList(); save(); toast('تغییر کرد', 'success'); }); return; }
       if (act === 'pin') { c.pinned = !c.pinned; toast(c.pinned?'سنجاق':'برداشته شد', 'info'); }
       if (act === 'mute') { c.muted = !c.muted; toast(c.muted?'بی‌صدا':'فعال', 'info'); }
+      if (act === 'toggle-comments') { c.commentsEnabled = !c.commentsEnabled; toast(c.commentsEnabled ? 'کامنت‌ها فعال شد' : 'کامنت‌ها غیرفعال شد', 'info'); }
+      if (act === 'toggle-sign') { c.signMessages = !c.signMessages; if (c.signMessages) c.signSince = Date.now(); toast(c.signMessages ? 'امضای پیام‌ها روشن شد' : 'امضای پیام‌ها خاموش شد', 'info'); }
       if (act === 'clear') { c.messages = []; toast('پاک شد', 'success'); }
       if (act === 'delete') {
         showConfirm('حذف', 'کل چت حذف شود؟', () => {
@@ -2892,8 +3551,8 @@ function finishCreate(data, type) {
 
 function createChat(data) {
   const chat = Object.assign({
-    id: rid(), unread:0, pinned:false, muted:false, draft:'', messages:[], createdAt:Date.now(),
-    description:'', coverPhoto:null, admins:[], permissions:{sendMessages:'all',editInfo:'all'}, joined:true, warner:'',
+    id:rid(), unread:0, pinned:false, muted:false, draft:'', messages:[], createdAt:Date.now(),
+    description:'', coverPhoto:null, admins:[], permissions:{sendMessages:'all',editInfo:'all'}, joined:true, warner:'', commentsEnabled:false, signMessages:false, signSince:0,
     joinedDate: getPersianDate(),
     owner: null
   }, data);
@@ -2901,7 +3560,6 @@ function createChat(data) {
   if ((chat.type === 'group' || chat.type === 'channel') && !chat.owner) {
     chat.owner = { name: state.me.name, username: state.me.username || '' };
   }
-
   state.chats.push(chat);
   if ((chat.type === 'group' || chat.type === 'channel') && chat.isPublic && chat.username) {
     const exists = state.directory.find(d => d.username === chat.username);
@@ -2972,17 +3630,10 @@ $('#settings-body').addEventListener('click', e => {
     }
     if (act === 'edit-joined') showPrompt('تاریخ عضویت', state.me.joinedDate || getPersianDate(), v => { state.me.joinedDate = v.trim() || getPersianDate(); renderSettings(); save(); toast('ذخیره شد', 'success'); });
     if (act === 'set-badge') {
-      openSheet(`
-        <div class="sheet-title">انتخاب نشان تایید</div>
-        <div class="sheet-item" data-badge="none">${icon('ban')}بدون نشان</div>
-        <div class="sheet-item" data-badge="blue">${vfHTML('blue', 20)} نشان افراد سرشناس</div>
-        <div class="sheet-item" data-badge="yellow">${vfHTML('yellow', 20)} نشان سازمانی</div>
-        <div class="sheet-item" data-badge="green">${vfHTML('green', 20)} نشان تجاری</div>
-        <div class="sheet-item" data-badge="personal">${vfHTML('personal', 20)} نشان شخصی</div>
-      `);
+      openSheet(badgeSheetHTML());
       $$('#sheet-content [data-badge]').forEach(b => b.addEventListener('click', () => {
         const bType = b.dataset.badge;
-        state.me.badgeType = bType === 'none' ? null : bType;
+        setBadgeEverywhere(state.me, bType === 'none' ? null : bType);
         closeSheet(); renderSettings(); renderChatList(); save();
         toast('نشان تغییر کرد', 'success');
       }));
@@ -3018,6 +3669,7 @@ $('#settings-body').addEventListener('click', e => {
     if (act === 'reset') {
       showConfirm('پاک کردن همه', 'تمام داده‌ها حذف شوند؟', () => {
         localStorage.removeItem(KEY); localStorage.removeItem(BACKUP_KEY);
+        resetMediaEls(); stopVoice(); wipeMedia();
         state = emptyState(); applyTheme();
         renderChatList(); renderSettings(); renderContacts(); toast('پاک شد', 'info');
       });
@@ -3216,6 +3868,196 @@ if (scrollBottomBtn) scrollBottomBtn.addEventListener('click', () => {
   messagesBox.scrollTo({top:messagesBox.scrollHeight, behavior:'smooth'});
   if (scrollUnread) scrollUnread.style.display = 'none';
 });
+
+
+/* ---------- کامنت زیر پست‌های کانال ---------- */
+let cmtCtx = null;
+function cmtFind() {
+  if (!cmtCtx) return null;
+  const chat = getChat(cmtCtx.chatId);
+  const m = chat && chat.messages.find(x => x.id === cmtCtx.msgId);
+  return m ? { chat, m } : null;
+}
+function openComments(chatId, msgId) {
+  const chat = getChat(chatId);
+  if (!chat || !chat.commentsEnabled) { toast('کامنت‌ها برای این کانال غیرفعال است', 'info'); return; }
+  cmtCtx = { chatId, msgId };
+  const f = cmtFind();
+  if (!f) { cmtCtx = null; return; }
+  $('#comments-sheet').innerHTML = `
+    <div class="cmt-head"><div class="cmt-htxt"><div class="cmt-title" id="cmt-title"></div><div class="cmt-sub" id="cmt-sub"></div></div><button class="icon-btn" id="cmt-close" aria-label="بستن">${icon('close', 20)}</button></div>
+    <div class="cmt-post" id="cmt-post"></div>
+    <div class="cmt-list" id="cmt-list"></div>
+    <div class="cmt-compose">
+      <textarea id="cmt-input" rows="1" maxlength="1000" placeholder="نظر خود را بنویسید…"></textarea>
+      <button class="cmt-send" id="cmt-send" aria-label="ارسال نظر">${icon('send', 18)}</button>
+    </div>`;
+  $('#cmt-post').textContent = pinPreview(f.m) || 'پست';
+  renderCommentList(true);
+  $('#comments-overlay').classList.add('show');
+  if (!(f.m.comments || []).length) simAIComments(f.chat, f.m, 2 + Math.floor(Math.random() * 3));
+}
+function closeComments() {
+  $('#comments-overlay').classList.remove('show');
+  const inp = $('#cmt-input'); if (inp) inp.blur();
+  cmtCtx = null; cmtTyping = null;
+  if (activeChatId) renderMessages(false);
+}
+function cmtAvatar(c) {
+  const mem = MEMBER_POOL.find(x => x.name === c.author);
+  const av = c.avatar || (mem && mem.avatar);
+  return (av && av.type === 'emoji') ? av.value : initials(c.author);
+}
+function renderCommentList(scrollEnd) {
+  const f = cmtFind();
+  if (!f) return;
+  const list = f.m.comments || (f.m.comments = []);
+  const typing = cmtTyping && cmtTyping.msgId === f.m.id ? cmtTyping.name : null;
+  $('#cmt-title').textContent = f.chat.name;
+  $('#cmt-sub').textContent = typing ? `${typing} در حال تایپ…` : (cmtTotal(f.m) ? `${fmtNum(cmtTotal(f.m))} نظر` : 'بدون نظر');
+  $('#cmt-sub').classList.toggle('typing', !!typing);
+  const box = $('#cmt-list');
+  if (!list.length) {
+    box.innerHTML = `<div class="cmt-empty">${icon('chat-outline', 42)}<div>هنوز نظری ثبت نشده</div><small>اولین نظر را شما بنویسید</small></div>`;
+    return;
+  }
+  const nearEnd = box.scrollHeight - box.scrollTop - box.clientHeight < 120;
+  box.innerHTML = list.map((c, i) => {
+    const prev = list[i - 1], next = list[i + 1];
+    const mine = c.uid === state.me.id && !c.ai;
+    const time = `<div class="meta"><span>${fmtTime(c.ts)}</span>${mine ? `<span class="cmt-del" data-cdel="${esc(c.id)}">${icon('trash', 12)}</span>` : ''}</div>`;
+    if (mine) return `<div class="msg out no-anim" data-cid="${esc(c.id)}"><div class="btext">${esc(c.text)}</div>${time}</div>`;
+    const sameBefore = prev && prev.author === c.author && !(prev.uid === state.me.id && !prev.ai);
+    const sameAfter = next && next.author === c.author && !(next.uid === state.me.id && !next.ai);
+    const [c1, c2] = nameColors(c.author);
+    return `<div class="msg-group-row">
+      <div class="msg-group-av${sameAfter ? ' empty' : ''}" style="background:linear-gradient(135deg,${c1},${c2})">${sameAfter ? '' : esc(cmtAvatar(c))}</div>
+      <div class="msg-group-wrap">
+        ${!sameBefore ? `<div class="msg-group-sender" style="color:${c1}">${esc(c.author)}</div>` : ''}
+        <div class="msg in no-anim" data-cid="${esc(c.id)}"><div class="btext">${esc(c.text)}</div>${time}</div>
+      </div>
+    </div>`;
+  }).join('');
+  if (typing) box.insertAdjacentHTML('beforeend', `<div class="cmt-typing"><span></span><span></span><span></span></div>`);
+  if (scrollEnd || nearEnd) box.scrollTop = box.scrollHeight;
+}
+
+/* ---------- نظرهای هوشمند (AI) ---------- */
+let cmtTyping = null;
+const aiCmtBusy = new Set(), aiCmtReplyBusy = new Set();
+function pushAIComment(chat, m, member, text) {
+  (m.comments || (m.comments = [])).push({ id: rid(), text, author: member.name, avatar: member.avatar, uid: null, ai: true, ts: Date.now() });
+  save();
+  if (activeChatId === chat.id) renderMessages(false);
+  if (cmtCtx && cmtCtx.msgId === m.id) renderCommentList(false);
+}
+function commentSystemPrompt(chat, m, member) {
+  return `تو «${member.name}» هستی، یکی از اعضای کانال «${chat.name}» که زیر یک پست نظر می‌نویسه. فقط خودِ نظرت رو بنویس، کوتاه (حداکثر ۲ خط)، فارسی خودمونی و طبیعی. اسم خودت یا توضیح اضافه ننویس.`;
+}
+async function aiComment(chat, m, userMsg) {
+  const hist = (m.comments || []).slice(-6).map(c => ({ out: c.uid === state.me.id && !c.ai, text: c.text, sender: c.author }));
+  const post = pinPreview(m) || 'یک پست';
+  const member = MEMBER_POOL[Math.floor(Math.random() * MEMBER_POOL.length)];
+  const lastNames = (m.comments || []).slice(-2).map(c => c.author);
+  const pool = MEMBER_POOL.filter(x => !lastNames.includes(x.name));
+  const who = pool[Math.floor(Math.random() * pool.length)] || member;
+  let reply = null;
+  if (state.settings.aiMode && navigator.onLine) {
+    reply = await fetchAI(userMsg || ('پست کانال: ' + post), hist, commentSystemPrompt(chat, m, who));
+    if (reply) reply = reply.replace(/^[«"]?[^:\n]{1,12}[:：]\s*/, '').trim().slice(0, 300);
+  }
+  if (!reply) reply = REPLIES[Math.floor(Math.random() * REPLIES.length)];
+  return { who, reply };
+}
+/* بعد از انتشار پست: چند نظر خودکار با فاصله‌ی زمانی */
+async function simAIComments(chat, m, count) {
+  if (aiCmtBusy.has(m.id)) return;
+  aiCmtBusy.add(m.id);
+  try {
+    for (let i = 0; i < count; i++) {
+      await new Promise(r => setTimeout(r, 3000 + Math.random() * 9000));
+      const c = getChat(chat.id);
+      if (!c || !c.commentsEnabled || !c.messages.includes(m) || m.deleted) break;
+      const r = await aiComment(c, m);
+      pushAIComment(c, m, r.who, r.reply);
+      if (state.settings.sounds && activeChatId !== c.id) beep();
+    }
+  } finally { aiCmtBusy.delete(m.id); }
+}
+/* وقتی کاربر نظر می‌نویسه، اعضا مثل گروه جواب می‌دن */
+async function aiReplyToComment(chat, m, userText) {
+  if (aiCmtReplyBusy.has(m.id)) return;
+  aiCmtReplyBusy.add(m.id);
+  try {
+    const n = Math.random() > 0.55 ? 2 : 1;
+    for (let i = 0; i < n; i++) {
+      await new Promise(r => setTimeout(r, 900 + Math.random() * 900));
+      const c = getChat(chat.id);
+      if (!c || !c.commentsEnabled || !c.messages.includes(m) || m.deleted) break;
+      const pick = MEMBER_POOL[Math.floor(Math.random() * MEMBER_POOL.length)];
+      cmtTyping = { msgId: m.id, name: pick.name };
+      if (cmtCtx && cmtCtx.msgId === m.id) renderCommentList(true);
+      const hist = (m.comments || []).slice(-6).map(x => ({ out: x.uid === state.me.id && !x.ai, text: x.text, sender: x.author }));
+      let reply = null;
+      if (state.settings.aiMode && navigator.onLine) {
+        reply = await fetchAI(userText, hist, commentSystemPrompt(c, m, pick) + ' پست: ' + (pinPreview(m) || ''));
+        if (reply) reply = reply.replace(/^[«"]?[^:\n]{1,12}[:：]\s*/, '').trim().slice(0, 300);
+      } else await new Promise(r => setTimeout(r, 1200));
+      if (!reply) reply = REPLIES[Math.floor(Math.random() * REPLIES.length)];
+      cmtTyping = null;
+      pushAIComment(c, m, pick, reply);
+      if (i < n - 1) await new Promise(r => setTimeout(r, 1200 + Math.random() * 1500));
+    }
+  } finally { cmtTyping = null; aiCmtReplyBusy.delete(m.id); if (cmtCtx && cmtCtx.msgId === m.id) renderCommentList(false); }
+}
+function sendComment() {
+  const f = cmtFind();
+  if (!f) return;
+  const inp = $('#cmt-input');
+  const text = inp.value.trim();
+  if (!text) return;
+  if (!f.chat.commentsEnabled) { toast('کامنت‌ها غیرفعال شده است', 'error'); return; }
+  (f.m.comments || (f.m.comments = [])).push({ id: rid(), text, author: state.me.name, username: state.me.username || '', uid: state.me.id, ts: Date.now() });
+  inp.value = ''; inp.style.height = 'auto';
+  save(); renderCommentList(true);
+  aiReplyToComment(f.chat, f.m, text);
+}
+(function bindCommentsUI() {
+  const ov = $('#comments-overlay');
+  if (!ov) return;
+  ov.addEventListener('click', e => {
+    if (e.target === ov || e.target.closest('#cmt-close')) { closeComments(); return; }
+    if (e.target.closest('#cmt-send')) { sendComment(); return; }
+    const del = e.target.closest('[data-cdel]');
+    if (del) {
+      const f = cmtFind(); if (!f) return;
+      showConfirm('حذف نظر', 'این نظر حذف شود؟', () => {
+        f.m.comments = (f.m.comments || []).filter(c => c.id !== del.dataset.cdel);
+        save(); renderCommentList(false); toast('نظر حذف شد', 'success');
+      });
+    }
+  });
+  ov.addEventListener('pointerdown', e => { if (e.target.closest('#cmt-send')) e.preventDefault(); });
+  ov.addEventListener('input', e => {
+    if (e.target.id !== 'cmt-input') return;
+    e.target.style.height = 'auto'; e.target.style.height = Math.min(e.target.scrollHeight, 110) + 'px';
+  });
+  ov.addEventListener('keydown', e => {
+    if (e.target.id === 'cmt-input' && e.key === 'Enter' && !e.shiftKey && innerWidth > 820) { e.preventDefault(); sendComment(); }
+  });
+  const vw = $('#viewer-overlay');
+  if (vw) vw.addEventListener('click', e => {
+    if (e.target.closest('.vw-dl')) {
+      const chat = getChat(activeChatId), m = findMedia(chat, vw.dataset.msg);
+      if (m && m.mediaId) downloadMedia(m);
+      return;
+    }
+    if (e.target.tagName !== 'IMG') closeViewer();
+  });
+  addEventListener('keydown', e => { if (e.key === 'Escape') { closeViewer(); if (cmtCtx) closeComments(); } });
+})();
+
+setTimeout(() => { gcMedia().catch(() => {}); }, 6000);
 
 /* ---------- INIT ---------- */
 state.chats.forEach(c => c.messages.forEach(m => renderedIds.add(m.id)));
