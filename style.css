@@ -1290,3 +1290,33 @@ html[data-theme="light"]{background-color:#ffffff;}
 html[data-theme="light"] .update-overlay{background:#ffffff !important;backdrop-filter:none !important;-webkit-backdrop-filter:none !important;}
 html[data-theme="light"] .update-box{background:#ffffff !important;}
 html[data-theme="light"] .update-ok{background:#1c1c1e;color:#fff;border-color:rgba(0,0,0,.1);}
+/* BIG UPDATE COUNTDOWN — زیر نوشته «گپ» (خیلی مینیمال) */
+#screen-list .main-hdr #list-title{position:relative!important}
+#list-title .cd-col{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;line-height:1;pointer-events:none}
+#list-title .cd-col .brand-text{font-size:14px;line-height:1;letter-spacing:.3px}
+#list-title .cd-sub{display:flex;align-items:center;gap:6px;line-height:1}
+#list-title .cd-sub small{font-size:8.5px;font-weight:500;opacity:.42;white-space:nowrap;letter-spacing:0}
+#list-title .cd-time{display:flex;align-items:center;direction:ltr;font-variant-numeric:tabular-nums;font-size:11px;font-weight:500;letter-spacing:.6px;opacity:.8}
+#list-title .cd-time b{font-weight:inherit;min-width:1.35em;text-align:center}
+#list-title .cd-time i{font-style:normal;opacity:.35;margin:0 .5px}
+#list-title .cd-bar{display:none}
+#list-title .cd-done-t{font-size:10px;font-weight:500;opacity:.7}
+#list-title.has-cd{color:#fff}
+html[data-theme="light"] #list-title.has-cd{color:#000}
+#list-title.cd-done{cursor:pointer;pointer-events:auto!important}
+
+/* حاشیه و انیمیشن مینیمال باکس شمارش */
+#list-title.has-cd::before{content:"";position:absolute;inset:0;border-radius:inherit;padding:1px;pointer-events:none;
+  background:linear-gradient(110deg,rgba(255,255,255,.10) 0%,rgba(139,92,246,.75) 25%,rgba(96,165,250,.75) 50%,rgba(255,255,255,.10) 75%,rgba(255,255,255,.10) 100%);
+  background-size:300% 100%;animation:cdBorder 6s linear infinite;
+  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;
+  mask:linear-gradient(#000 0 0) content-box exclude,linear-gradient(#000 0 0);mask-composite:exclude}
+@keyframes cdBorder{0%{background-position:300% 0}100%{background-position:0 0}}
+#list-title .cd-col{animation:cdIn .7s cubic-bezier(.2,.8,.2,1) both}
+@keyframes cdIn{from{opacity:0;transform:translateY(5px);filter:blur(3px)}to{opacity:1;transform:none;filter:none}}
+#list-title .cd-sub small{animation:cdBreath 4s ease-in-out infinite}
+@keyframes cdBreath{0%,100%{opacity:.36}50%{opacity:.6}}
+#list-title .cd-time b.tk{animation:cdTick .45s cubic-bezier(.2,.8,.2,1)}
+@keyframes cdTick{from{opacity:.25;transform:translateY(-4px)}to{opacity:1;transform:none}}
+html[data-theme="light"] #list-title.has-cd::before{background:linear-gradient(110deg,rgba(0,0,0,.08) 0%,rgba(139,92,246,.7) 25%,rgba(59,130,246,.7) 50%,rgba(0,0,0,.08) 75%,rgba(0,0,0,.08) 100%);background-size:300% 100%}
+@media (prefers-reduced-motion:reduce){#list-title.has-cd::before,#list-title .cd-col,#list-title .cd-sub small,#list-title .cd-time b.tk{animation:none!important}}
