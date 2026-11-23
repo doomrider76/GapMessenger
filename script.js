@@ -9,6 +9,11 @@ const rid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 
 const icon = (n, s = 20) => `<svg width="${s}" height="${s}"><use href="#i-${n}"/></svg>`;
 const KEY = 'pisfon_v3', BACKUP_KEY = 'pisfon_backup_auto', VERSION_KEY = 'pisfon_version';
 const APP_VERSION = '1.0.3';
+const BIGUPDATE_RELEASE_AT = 1795543200000; // سه‌شنبه ۲۴ نوامبر ۲۰۲۶ ساعت ۲۲:۰۰ به وقت باکو = ۱۸:۰۰ UTC — برای تغییر زمان فقط این عدد را عوض کن
+const BIGUPDATE_SPAN_MS = 24 * 3600 * 1000; // طول نوار باریک پیشرفت
+const BIGUPDATE_DONE = 'gap_bigupdate_done';
+let _bigDone = false;
+try { _bigDone = localStorage.getItem(BIGUPDATE_DONE) === String(BIGUPDATE_RELEASE_AT); } catch {}
 
 // --- تاریخ عضویت (شمسی) ---
 function getPersianDate(ts = Date.now()) {
@@ -3390,7 +3395,7 @@ function switchTab(tab) {
   const titleEl = $('#list-title');
   if (titleEl) {
     const labels = {chats:'گپ', contacts:'مخاطبین', settings:'تنظیمات'};
-    titleEl.innerHTML = `<span class="brand-text">${labels[tab] || 'گپ'}</span>`;
+    titleEl.dataset.tab = tab; titleEl.dataset.label = labels[tab] || 'گپ'; renderBrandTitle();
   }
   updateHeaderLeftBtn(tab);
   if (tab === 'contacts') renderContacts();
@@ -4066,6 +4071,59 @@ renderContacts();
 renderSettings();
 switchTab('chats');
 checkVersion();
+
+/* ---------- شمارش معکوس انتشار آپدیت بزرگ گپ (داخل باکس گرد «گپ») ----------
+   زمان هدف یک timestamp مطلق است، نه تایمر در حال اجرا؛ پس با بسته بودن برنامه،
+   آفلاین بودن یا خاموش بودن گوشی هم متوقف نمی‌شود و با ساعت واقعی دستگاه حساب می‌شود. */
+function renderBrandTitle() {
+  const el = $('#list-title');
+  if (!el) return;
+  const tab = el.dataset.tab || 'chats';
+  const label = el.dataset.label || 'گپ';
+  const brand = `<span class="brand-text">${label}</span>`;
+  const p = n => String(n).padStart(2, '0');
+  const left = BIGUPDATE_RELEASE_AT - Date.now();
+  let html = brand, cls = '', pct = 0, v = null;
+  if (tab === 'chats' && !_bigDone) {
+    if (left > 0) {
+      const t = Math.floor(left / 1000);
+      v = [p(Math.floor(t / 3600)), p(Math.floor(t % 3600 / 60)), p(t % 60)];
+      pct = Math.min(100, Math.max(0, (1 - left / BIGUPDATE_SPAN_MS) * 100));
+      html = `<span class="cd-col">${brand}<span class="cd-sub"><small>تا انتشار آپدیت بزرگ گپ</small><span class="cd-time"><b>${v[0]}</b><i>:</i><b>${v[1]}</b><i>:</i><b>${v[2]}</b></span></span></span><span class="cd-bar"><b></b></span>`;
+      cls = 'has-cd';
+    } else {
+      html = `<span class="cd-col">${brand}<span class="cd-sub"><small class="cd-done-t">آپدیت بزرگ منتشر شد 🎉 — بزن تا دریافت شود</small></span></span>`;
+      cls = 'has-cd cd-done';
+    }
+  }
+  const key = html.replace(/>\d\d</g, '><');
+  if (el._k !== key) { el.innerHTML = html; el._k = key; }
+  else if (v) { el.querySelectorAll('.cd-time b').forEach((n, k) => { if (n.textContent !== v[k]) { n.textContent = v[k]; n.classList.remove('tk'); void n.offsetWidth; n.classList.add('tk'); } }); }
+  const bar = el.querySelector('.cd-bar b');
+  if (bar) bar.style.width = pct.toFixed(2) + '%';
+  el.classList.toggle('has-cd', cls.includes('has-cd'));
+  el.classList.toggle('cd-done', cls.includes('cd-done'));
+}
+(function initBigUpdateCountdown() {
+  const el = $('#list-title');
+  if (!el) return;
+  renderBrandTitle();
+  setInterval(renderBrandTitle, 1000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) renderBrandTitle(); });
+  addEventListener('focus', renderBrandTitle);
+  addEventListener('online', renderBrandTitle);
+  el.addEventListener('click', async () => {
+    if (!el.classList.contains('cd-done')) return;
+    try { localStorage.setItem(BIGUPDATE_DONE, String(BIGUPDATE_RELEASE_AT)); } catch {}
+    toast('در حال دریافت آپدیت...', 'info');
+    try {
+      if ('caches' in window) for (const n of await caches.keys()) await caches.delete(n);
+      if ('serviceWorker' in navigator) for (const r of await navigator.serviceWorker.getRegistrations()) await r.unregister();
+    } catch {}
+    location.reload();
+  });
+})();
+
 requestNotifPermission();
 
 if (shouldShowWelcome()) setTimeout(showBackupWelcome, 600);
