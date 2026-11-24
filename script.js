@@ -9,7 +9,7 @@ const rid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 
 const icon = (n, s = 20) => `<svg width="${s}" height="${s}"><use href="#i-${n}"/></svg>`;
 const KEY = 'pisfon_v3', BACKUP_KEY = 'pisfon_backup_auto', VERSION_KEY = 'pisfon_version';
 const APP_VERSION = '1.0.3';
-const BIGUPDATE_RELEASE_AT = 1795543200000; // سه‌شنبه ۲۴ نوامبر ۲۰۲۶ ساعت ۲۲:۰۰ به وقت باکو = ۱۸:۰۰ UTC — برای تغییر زمان فقط این عدد را عوض کن
+const BIGUPDATE_RELEASE_AT = 1795555500000; // سه‌شنبه ۲۴ نوامبر ۲۰۲۶ ساعت ۲۲:۰۰ به وقت باکو = ۱۸:۰۰ UTC — برای تغییر زمان فقط این عدد را عوض کن
 const BIGUPDATE_SPAN_MS = 24 * 3600 * 1000; // طول نوار باریک پیشرفت
 const BIGUPDATE_DONE = 'gap_bigupdate_done';
 let _bigDone = false;
